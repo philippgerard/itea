@@ -15,6 +15,87 @@ struct CreateIssueView: View {
     @State private var showError = false
 
     var body: some View {
+        #if targetEnvironment(macCatalyst)
+        macOSLayout
+        #else
+        iOSLayout
+        #endif
+    }
+
+    // MARK: - macOS Layout
+
+    private var macOSLayout: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("New Issue")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+
+            Divider()
+
+            // Form content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Title section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Title")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        TextField("Issue title", text: $title)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    // Description section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Description")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        TextEditor(text: $descriptionText)
+                            .frame(minHeight: 200)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color(uiColor: .separator), lineWidth: 1)
+                            )
+                    }
+                }
+                .padding(24)
+            }
+
+            Divider()
+
+            // Footer with buttons
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Create Issue") {
+                    Task { await createIssue() }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(title.isEmpty || isSubmitting)
+            }
+            .padding(20)
+        }
+        .frame(minWidth: 500, minHeight: 450)
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Unknown error")
+        }
+    }
+
+    // MARK: - iOS Layout
+
+    private var iOSLayout: some View {
         NavigationStack {
             Form {
                 Section("Title") {
@@ -27,9 +108,7 @@ struct CreateIssueView: View {
                 }
             }
             .navigationTitle("New Issue")
-            #if !targetEnvironment(macCatalyst)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

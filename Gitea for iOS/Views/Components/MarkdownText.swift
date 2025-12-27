@@ -4,10 +4,23 @@ import MarkdownUI
 struct MarkdownText: View {
     let content: String
 
+    @EnvironmentObject private var authManager: AuthenticationManager
+    @Environment(DeepLinkHandler.self) private var deepLinkHandler: DeepLinkHandler?
+
     var body: some View {
         Markdown(content)
             .markdownTheme(.gitHub)
             .textSelection(.enabled)
+            .environment(\.openURL, OpenURLAction { url in
+                // Try to handle as internal Gitea link
+                if let deepLinkHandler,
+                   let serverURL = authManager.getServerURL(),
+                   deepLinkHandler.handleURL(url, serverURL: serverURL) {
+                    return .handled
+                }
+                // Otherwise open in default browser
+                return .systemAction
+            })
     }
 }
 
@@ -33,4 +46,5 @@ struct MarkdownText: View {
         }
         .padding()
     }
+    .environmentObject(AuthenticationManager())
 }

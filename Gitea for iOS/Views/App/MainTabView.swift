@@ -26,8 +26,11 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 
 struct MainTabView: View {
     @EnvironmentObject var authManager: AuthenticationManager
+    @Environment(DeepLinkHandler.self) private var deepLinkHandler: DeepLinkHandler?
     @State private var selectedTab = 0
     @State private var selectedItem: NavigationItem? = .repositories
+    @State private var showCreatePRSheet = false
+    @State private var pendingPRAction: DeepLinkAction?
 
     private var apiClient: APIClient? {
         guard let serverURL = authManager.getServerURL(),
@@ -38,12 +41,40 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        #if targetEnvironment(macCatalyst)
-        sidebarNavigation
-            .frame(minWidth: 900, minHeight: 600)
-        #else
-        tabNavigation
-        #endif
+        Group {
+            #if targetEnvironment(macCatalyst)
+            sidebarNavigation
+                .frame(minWidth: 900, minHeight: 600)
+            #else
+            tabNavigation
+            #endif
+        }
+        .onChange(of: deepLinkHandler?.pendingAction) { _, newAction in
+            if case .createPullRequest = newAction {
+                pendingPRAction = newAction
+                showCreatePRSheet = true
+                deepLinkHandler?.clearPendingAction()
+            }
+        }
+        .sheet(isPresented: $showCreatePRSheet) {
+            if let apiClient,
+               case let .createPullRequest(owner, repo, base, head, title, body) = pendingPRAction {
+                CreatePullRequestView(
+                    owner: owner,
+                    repo: repo,
+                    pullRequestService: PullRequestService(apiClient: apiClient),
+                    repositoryService: RepositoryService(apiClient: apiClient),
+                    onCreated: { },
+                    initialTitle: title,
+                    initialBody: body,
+                    initialHeadBranch: head,
+                    initialBaseBranch: base
+                )
+                #if targetEnvironment(macCatalyst)
+                .presentationSizing(.fitted)
+                #endif
+            }
+        }
     }
 
     // MARK: - macOS Sidebar Navigation
@@ -56,7 +87,7 @@ struct MainTabView: View {
                         .tag(item)
                 }
             }
-            .navigationTitle("Gitea")
+            .navigationTitle("iTea")
             .listStyle(.sidebar)
         } detail: {
             if let selectedItem {

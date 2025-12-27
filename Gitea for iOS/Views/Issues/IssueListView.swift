@@ -72,6 +72,9 @@ struct IssueListView: View {
             CreateIssueView(owner: owner, repo: repo, issueService: issueService) {
                 Task { await loadIssues() }
             }
+            #if targetEnvironment(macCatalyst)
+            .presentationSizing(.fitted)
+            #endif
         }
         .refreshable {
             await loadIssues()

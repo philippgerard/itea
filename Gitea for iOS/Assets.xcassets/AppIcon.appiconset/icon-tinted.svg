@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Tinted icons use black shapes on transparent background -->
+  <!-- The system applies the user's chosen tint color -->
+
+  <!-- Steam wisps -->
+  <g transform="translate(512, 280)">
+    <path d="M0,0 Q-15,-40 5,-80 Q25,-120 0,-160"
+          fill="none"
+          stroke="#000000"
+          stroke-width="24"
+          stroke-linecap="round"
+          opacity="0.6"/>
+    <path d="M40,20 Q55,-15 40,-50 Q25,-85 45,-120"
+          fill="none"
+          stroke="#000000"
+          stroke-width="16"
+          stroke-linecap="round"
+          opacity="0.4"/>
+  </g>
+
+  <!-- Tea cup body -->
+  <g transform="translate(512, 580)">
+    <!-- Cup body -->
+    <path d="M-180,-140
+             L-180,80
+             Q-180,140 -120,140
+             L120,140
+             Q180,140 180,80
+             L180,-140
+             Q180,-180 140,-180
+             L-140,-180
+             Q-180,-180 -180,-140 Z"
+          fill="#000000"/>
+
+    <!-- Handle -->
+    <path d="M180,-80
+             Q280,-80 280,40
+             Q280,120 200,120
+             L200,80
+             Q240,80 240,40
+             Q240,-40 180,-40"
+          fill="#000000"/>
+  </g>
+</svg>

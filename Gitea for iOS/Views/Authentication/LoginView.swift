@@ -22,11 +22,11 @@ struct LoginView: View {
                             .font(.system(size: 56))
                             .foregroundStyle(.green)
 
-                        Text("Gitea")
+                        Text("iTea")
                             .font(.largeTitle)
                             .fontWeight(.bold)
 
-                        Text("Connect to your self-hosted instance")
+                        Text("A Gitea client for iOS")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

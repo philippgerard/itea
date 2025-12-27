@@ -7,6 +7,12 @@ struct CreatePullRequestView: View {
     let repositoryService: RepositoryService
     let onCreated: () -> Void
 
+    // Optional prefilled values (from URL)
+    var initialTitle: String?
+    var initialBody: String?
+    var initialHeadBranch: String?
+    var initialBaseBranch: String?
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var title = ""
@@ -18,8 +24,135 @@ struct CreatePullRequestView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var hasAppliedInitialValues = false
 
     var body: some View {
+        #if targetEnvironment(macCatalyst)
+        macOSLayout
+        #else
+        iOSLayout
+        #endif
+    }
+
+    // MARK: - macOS Layout
+
+    private var macOSLayout: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("New Pull Request")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+
+            Divider()
+
+            // Form content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Branches section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Branches")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+
+                        if isLoadingBranches {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                            .padding(.vertical, 20)
+                        } else {
+                            VStack(spacing: 12) {
+                                HStack {
+                                    Text("Head branch")
+                                        .frame(width: 100, alignment: .leading)
+                                    Picker("", selection: $headBranch) {
+                                        Text("Select branch").tag("")
+                                        ForEach(branches) { branch in
+                                            Text(branch.name).tag(branch.name)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                }
+
+                                HStack {
+                                    Text("Base branch")
+                                        .frame(width: 100, alignment: .leading)
+                                    Picker("", selection: $baseBranch) {
+                                        Text("Select branch").tag("")
+                                        ForEach(branches) { branch in
+                                            Text(branch.name).tag(branch.name)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                }
+                            }
+                        }
+                    }
+
+                    // Title section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Title")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        TextField("Pull request title", text: $title)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    // Description section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Description")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        TextEditor(text: $descriptionText)
+                            .frame(minHeight: 150)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color(uiColor: .separator), lineWidth: 1)
+                            )
+                    }
+                }
+                .padding(24)
+            }
+
+            Divider()
+
+            // Footer with buttons
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Create Pull Request") {
+                    Task { await createPullRequest() }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!isFormValid || isSubmitting)
+            }
+            .padding(20)
+        }
+        .frame(minWidth: 540, minHeight: 520)
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Unknown error")
+        }
+        .task {
+            await loadBranches()
+        }
+    }
+
+    // MARK: - iOS Layout
+
+    private var iOSLayout: some View {
         NavigationStack {
             Form {
                 Section("Branches") {
@@ -56,9 +189,7 @@ struct CreatePullRequestView: View {
                 }
             }
             .navigationTitle("New Pull Request")
-            #if !targetEnvironment(macCatalyst)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -94,9 +225,25 @@ struct CreatePullRequestView: View {
         do {
             branches = try await repositoryService.getBranches(owner: owner, repo: repo)
 
-            // Set default base branch if available
-            if let defaultBranch = branches.first(where: { $0.name == "main" || $0.name == "master" }) {
-                baseBranch = defaultBranch.name
+            // Apply initial values if provided (from URL)
+            if !hasAppliedInitialValues {
+                hasAppliedInitialValues = true
+
+                if let initialTitle {
+                    title = initialTitle
+                }
+                if let initialBody {
+                    descriptionText = initialBody
+                }
+                if let initialBaseBranch, branches.contains(where: { $0.name == initialBaseBranch }) {
+                    baseBranch = initialBaseBranch
+                } else if let defaultBranch = branches.first(where: { $0.name == "main" || $0.name == "master" }) {
+                    // Fallback to default base branch
+                    baseBranch = defaultBranch.name
+                }
+                if let initialHeadBranch, branches.contains(where: { $0.name == initialHeadBranch }) {
+                    headBranch = initialHeadBranch
+                }
             }
         } catch {
             errorMessage = "Failed to load branches: \(error.localizedDescription)"

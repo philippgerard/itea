@@ -78,6 +78,9 @@ struct PullRequestListView: View {
             ) {
                 Task { await loadPullRequests() }
             }
+            #if targetEnvironment(macCatalyst)
+            .presentationSizing(.fitted)
+            #endif
         }
         .refreshable {
             await loadPullRequests()
