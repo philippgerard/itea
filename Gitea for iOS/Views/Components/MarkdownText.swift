@@ -9,7 +9,7 @@ struct MarkdownText: View {
 
     var body: some View {
         Markdown(content)
-            .markdownTheme(.subtle)
+            .markdownTheme(.iTea)
             .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { url in
                 if let deepLinkHandler,
@@ -24,18 +24,21 @@ struct MarkdownText: View {
 
 #Preview {
     ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-            MarkdownText(content: "**Bold** and *italic* text")
-            MarkdownText(content: "Code: `inline code here`")
-            MarkdownText(content: "A [link](https://example.com) in text")
+        VStack(alignment: .leading, spacing: 24) {
+            MarkdownText(content: "Regular paragraph text that flows naturally.")
+            MarkdownText(content: "**Bold** and *italic* and `code`")
             MarkdownText(content: """
-            ## Header
+            ## Section Header
 
-            - List item 1
-            - List item 2
+            Some body text here.
 
-            - [ ] Task 1
-            - [x] Task 2 (done)
+            ### Subsection
+
+            - Item one
+            - Item two
+
+            - [ ] Unchecked task
+            - [x] Completed task
             """)
         }
         .padding()
@@ -43,89 +46,110 @@ struct MarkdownText: View {
     .environmentObject(AuthenticationManager())
 }
 
-// A restrained theme that doesn't fight the UI
 extension Theme {
-    @MainActor static let subtle = Theme()
-        // Body text: inherit system font
+    @MainActor static let iTea = Theme()
+        // Base text styling
         .text {
             ForegroundColor(.primary)
+            FontSize(15)
         }
-        // Paragraphs: tight, no excess space
+        // Paragraphs with comfortable spacing
         .paragraph { configuration in
             configuration.label
-                .markdownMargin(top: 0, bottom: 4)
+                .markdownMargin(top: 0, bottom: 8)
         }
-        // h1: bold, same size - let context provide hierarchy
+        // h1: Slightly larger, semibold
         .heading1 { configuration in
+            configuration.label
+                .markdownMargin(top: 12, bottom: 6)
+                .markdownTextStyle {
+                    FontWeight(.semibold)
+                    FontSize(17)
+                }
+        }
+        // h2: Same size as body, just semibold
+        .heading2 { configuration in
+            configuration.label
+                .markdownMargin(top: 10, bottom: 4)
+                .markdownTextStyle {
+                    FontWeight(.semibold)
+                    FontSize(15)
+                }
+        }
+        // h3: Same size, medium weight
+        .heading3 { configuration in
             configuration.label
                 .markdownMargin(top: 8, bottom: 4)
                 .markdownTextStyle {
-                    FontWeight(.semibold)
-                }
-        }
-        // h2: semibold, same size
-        .heading2 { configuration in
-            configuration.label
-                .markdownMargin(top: 6, bottom: 2)
-                .markdownTextStyle {
-                    FontWeight(.semibold)
-                }
-        }
-        // h3: medium weight, same size
-        .heading3 { configuration in
-            configuration.label
-                .markdownMargin(top: 4, bottom: 2)
-                .markdownTextStyle {
                     FontWeight(.medium)
+                    FontSize(15)
                 }
         }
-        // Inline code: subtle
+        // Inline code
         .code {
             FontFamilyVariant(.monospaced)
-            FontSize(.em(0.9))
+            FontSize(13)
+            BackgroundColor(Color(.systemGray6))
         }
-        // Code blocks: minimal
+        // Code blocks
         .codeBlock { configuration in
             ScrollView(.horizontal, showsIndicators: false) {
                 configuration.label
                     .markdownTextStyle {
                         FontFamilyVariant(.monospaced)
-                        FontSize(.em(0.85))
+                        FontSize(13)
                     }
             }
-            .padding(10)
-            .background(Color(.tertiarySystemFill))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .markdownMargin(top: 4, bottom: 4)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .markdownMargin(top: 8, bottom: 8)
         }
-        // Blockquotes: subtle left accent
+        // Blockquotes
         .blockquote { configuration in
             configuration.label
                 .markdownTextStyle {
                     ForegroundColor(.secondary)
+                    FontSize(15)
                 }
-                .padding(.leading, 10)
+                .padding(.leading, 12)
                 .overlay(alignment: .leading) {
-                    Rectangle()
+                    RoundedRectangle(cornerRadius: 1)
                         .fill(Color.secondary.opacity(0.3))
-                        .frame(width: 2)
+                        .frame(width: 3)
                 }
-                .markdownMargin(top: 4, bottom: 4)
+                .markdownMargin(top: 6, bottom: 6)
         }
-        // Lists: tight
+        // Lists
         .listItem { configuration in
             configuration.label
-                .markdownMargin(top: 1, bottom: 1)
+                .markdownMargin(top: 2, bottom: 2)
         }
-        // Task lists: subtle checkmarks
+        // Task list markers - subtle SF Symbols
         .taskListMarker { configuration in
             Image(systemName: configuration.isCompleted ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(configuration.isCompleted ? .secondary : .tertiary)
-                .font(.system(size: 14))
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(configuration.isCompleted ? Color.secondary : Color(.systemGray4))
         }
-        // Thematic break (hr): subtle
+        // Thematic breaks
         .thematicBreak {
             Divider()
+                .markdownMargin(top: 12, bottom: 12)
+        }
+        // Tables - cleaner styling
+        .table { configuration in
+            configuration.label
                 .markdownMargin(top: 8, bottom: 8)
+                .markdownTableBorderStyle(.init(color: .clear))
+                .markdownTableBackgroundStyle(.alternatingRows(Color(.systemGray6), .clear))
+        }
+        .tableCell { configuration in
+            configuration.label
+                .markdownTextStyle {
+                    FontSize(14)
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
         }
 }

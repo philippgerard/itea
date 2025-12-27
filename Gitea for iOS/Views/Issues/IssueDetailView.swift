@@ -15,26 +15,25 @@ struct IssueDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                issueHeader
-                    .padding(.horizontal)
-                    .padding(.top)
+            VStack(spacing: 16) {
+                // Header card
+                headerCard
 
+                // Body card (if has body)
                 if let body = issue.body, !body.isEmpty {
-                    issueBody(body)
-                        .padding(.horizontal)
-                        .padding(.top, 16)
+                    bodyCard(body)
                 }
 
-                Divider()
-                    .padding(.top, 20)
-
+                // Comments section
                 commentsSection
-                    .padding(.horizontal)
-
-                addCommentSection
-                    .padding()
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 100) // Space for input
+        }
+        .background(Color(.systemGroupedBackground))
+        .safeAreaInset(edge: .bottom) {
+            commentInputBar
         }
         .navigationTitle("#\(issue.number)")
         #if !targetEnvironment(macCatalyst)
@@ -45,130 +44,165 @@ struct IssueDetailView: View {
         }
     }
 
-    private var issueHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    // MARK: - Header Card
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
             // Title
             Text(issue.title)
-                .font(.title3)
-                .fontWeight(.semibold)
+                .font(.headline)
 
-            // Status line
+            // Status row
             HStack(spacing: 8) {
+                // Status badge
                 HStack(spacing: 4) {
                     Image(systemName: issue.isOpen ? "circle.fill" : "checkmark.circle.fill")
                         .font(.system(size: 8))
                     Text(issue.isOpen ? "Open" : "Closed")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                 }
-                .font(.subheadline)
                 .foregroundStyle(issue.isOpen ? .green : .purple)
 
+                Text("·")
+                    .foregroundStyle(.quaternary)
+
                 if let date = issue.createdAt {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
                     Text(date, style: .relative)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+
+                Spacer()
             }
 
-            // Labels - inline, subtle
+            // Labels
             if issue.hasLabels, let labels = issue.labels {
-                HStack(spacing: 6) {
-                    ForEach(labels) { label in
-                        Text(label.name)
-                            .font(.caption)
-                            .foregroundStyle(label.uiColor)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(labels) { label in
+                            LabelTagView(label: label)
+                        }
                     }
                 }
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func issueBody(_ body: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Author attribution
-            HStack(spacing: 8) {
-                UserAvatarView(user: issue.user, size: 24)
+    // MARK: - Body Card
 
-                Text(issue.user.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+    private func bodyCard(_ body: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Author row
+            HStack(spacing: 10) {
+                UserAvatarView(user: issue.user, size: 32)
 
-                if let date = issue.createdAt {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
-                    Text(date, style: .date)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(issue.user.displayName)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
+
+                    if let date = issue.createdAt {
+                        Text(date, style: .date)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+
+                Spacer()
             }
 
-            // Body content
+            // Content
             MarkdownText(content: body)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 12)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - Comments Section
+
     private var commentsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header
+            if !comments.isEmpty || isLoading {
+                Text("Comments")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 4)
+                    .padding(.top, 8)
+            }
+
             if isLoading {
                 HStack {
                     Spacer()
                     ProgressView()
-                        .padding(.vertical, 24)
+                        .padding(.vertical, 20)
                     Spacer()
                 }
             } else if comments.isEmpty {
-                Text("No comments")
+                // Empty state - subtle
+                Text("No comments yet")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                    .padding(.vertical, 20)
             } else {
-                ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
+                ForEach(comments) { comment in
                     CommentView(comment: comment)
-                    if index < comments.count - 1 {
-                        Divider()
-                    }
                 }
             }
         }
     }
 
-    private var addCommentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    // MARK: - Comment Input
+
+    private var commentInputBar: some View {
+        VStack(spacing: 0) {
             Divider()
 
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 TextField("Add a comment...", text: $newComment, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .lineLimit(1...6)
+                    .lineLimit(1...5)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
                     .focused($isCommentFocused)
 
                 Button {
                     Task { await submitComment() }
                 } label: {
-                    if isSubmitting {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(newComment.isEmpty ? Color.gray : Color.accentColor)
+                    Group {
+                        if isSubmitting {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 28))
+                        }
                     }
+                    .foregroundStyle(newComment.isEmpty ? Color(.systemGray4) : Color.accentColor)
                 }
                 .disabled(newComment.isEmpty || isSubmitting)
             }
-            .padding(12)
-            .background(Color(.tertiarySystemFill))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(.bar)
         }
     }
 
+    // MARK: - Actions
+
     private func loadComments() async {
         isLoading = true
-
         do {
             comments = try await issueService.getComments(
                 owner: owner,
@@ -178,7 +212,6 @@ struct IssueDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
-
         isLoading = false
     }
 

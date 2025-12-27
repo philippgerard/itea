@@ -4,87 +4,93 @@ struct CommentView: View {
     let comment: Comment
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Author line: avatar, name, time - all subtle
-            HStack(spacing: 8) {
-                UserAvatarView(user: comment.user, size: 24)
+        VStack(alignment: .leading, spacing: 10) {
+            // Author row
+            HStack(spacing: 10) {
+                UserAvatarView(user: comment.user, size: 32)
 
-                Text(comment.user.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Text("·")
-                    .foregroundStyle(.tertiary)
-
-                if let date = comment.createdAt {
-                    Text(date, style: .relative)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(comment.user.displayName)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
+
+                    HStack(spacing: 4) {
+                        if let date = comment.createdAt {
+                            Text(date, style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if comment.isEdited {
+                            Text("· edited")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
 
-                if comment.isEdited {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
-                    Text("edited")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                }
+                Spacer()
             }
 
-            // Content: just the markdown, no container
+            // Content
             MarkdownText(content: comment.body)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 12)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
 #Preview {
-    VStack(spacing: 0) {
-        CommentView(
-            comment: Comment(
-                id: 1,
-                body: "This is a short comment.",
-                user: User(
+    ScrollView {
+        VStack(spacing: 12) {
+            CommentView(
+                comment: Comment(
                     id: 1,
-                    login: "testuser",
-                    fullName: "Test User",
-                    email: nil,
-                    avatarUrl: nil,
-                    isAdmin: false,
-                    created: nil
-                ),
-                createdAt: Date(),
-                updatedAt: nil
+                    body: "This is a short comment.",
+                    user: User(
+                        id: 1,
+                        login: "testuser",
+                        fullName: "Test User",
+                        email: nil,
+                        avatarUrl: nil,
+                        isAdmin: false,
+                        created: nil
+                    ),
+                    createdAt: Date(),
+                    updatedAt: nil
+                )
             )
-        )
-        Divider()
-        CommentView(
-            comment: Comment(
-                id: 2,
-                body: """
-                This is a longer comment with **markdown**.
 
-                ## A heading
-
-                - List item one
-                - List item two
-
-                And some `inline code` too.
-                """,
-                user: User(
+            CommentView(
+                comment: Comment(
                     id: 2,
-                    login: "another",
-                    fullName: "Another Person",
-                    email: nil,
-                    avatarUrl: nil,
-                    isAdmin: false,
-                    created: nil
-                ),
-                createdAt: Date().addingTimeInterval(-3600),
-                updatedAt: Date()
+                    body: """
+                    This is a longer comment with **markdown**.
+
+                    ## A heading
+
+                    - List item one
+                    - List item two
+
+                    And some `inline code` too.
+                    """,
+                    user: User(
+                        id: 2,
+                        login: "another",
+                        fullName: "Another Person",
+                        email: nil,
+                        avatarUrl: nil,
+                        isAdmin: false,
+                        created: nil
+                    ),
+                    createdAt: Date().addingTimeInterval(-3600),
+                    updatedAt: Date()
+                )
             )
-        )
+        }
+        .padding()
     }
-    .padding(.horizontal)
+    .background(Color(.systemGroupedBackground))
 }

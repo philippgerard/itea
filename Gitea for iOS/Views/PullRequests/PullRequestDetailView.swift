@@ -15,26 +15,25 @@ struct PullRequestDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                prHeader
-                    .padding(.horizontal)
-                    .padding(.top)
+            VStack(spacing: 16) {
+                // Header card
+                headerCard
 
+                // Body card (if has body)
                 if let body = pullRequest.body, !body.isEmpty {
-                    prBody(body)
-                        .padding(.horizontal)
-                        .padding(.top, 16)
+                    bodyCard(body)
                 }
 
-                Divider()
-                    .padding(.top, 20)
-
+                // Comments section
                 commentsSection
-                    .padding(.horizontal)
-
-                addCommentSection
-                    .padding()
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 100)
+        }
+        .background(Color(.systemGroupedBackground))
+        .safeAreaInset(edge: .bottom) {
+            commentInputBar
         }
         .navigationTitle("#\(pullRequest.number)")
         #if !targetEnvironment(macCatalyst)
@@ -45,58 +44,80 @@ struct PullRequestDetailView: View {
         }
     }
 
-    private var prHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    // MARK: - Header Card
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
             // Title
             Text(pullRequest.title)
-                .font(.title3)
-                .fontWeight(.semibold)
+                .font(.headline)
 
-            // Status and branch info
+            // Status row
             HStack(spacing: 8) {
-                // Status
+                // Status badge
                 HStack(spacing: 4) {
                     Image(systemName: statusIcon)
                         .font(.system(size: 10))
                     Text(statusText)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                 }
-                .font(.subheadline)
                 .foregroundStyle(statusColor)
 
+                Text("·")
+                    .foregroundStyle(.quaternary)
+
                 if let date = pullRequest.createdAt {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
                     Text(date, style: .relative)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+
+                Spacer()
             }
 
-            // Branch info - subtle
+            // Branch info
             if let head = pullRequest.head, let base = pullRequest.base {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Text(head.ref)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.12))
                         .foregroundStyle(.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+
                     Image(systemName: "arrow.right")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
+
                     Text(base.ref)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.12))
                         .foregroundStyle(.green)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
-                .font(.caption)
             }
 
-            // Labels - inline, subtle
+            // Labels
             if pullRequest.hasLabels, let labels = pullRequest.labels {
-                HStack(spacing: 6) {
-                    ForEach(labels) { label in
-                        Text(label.name)
-                            .font(.caption)
-                            .foregroundStyle(label.uiColor)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(labels) { label in
+                            LabelTagView(label: label)
+                        }
                     }
                 }
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var statusIcon: String {
@@ -129,91 +150,115 @@ struct PullRequestDetailView: View {
         }
     }
 
-    private func prBody(_ body: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Author attribution
-            HStack(spacing: 8) {
-                UserAvatarView(user: pullRequest.user, size: 24)
+    // MARK: - Body Card
 
-                Text(pullRequest.user.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+    private func bodyCard(_ body: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Author row
+            HStack(spacing: 10) {
+                UserAvatarView(user: pullRequest.user, size: 32)
 
-                if let date = pullRequest.createdAt {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
-                    Text(date, style: .date)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(pullRequest.user.displayName)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
+
+                    if let date = pullRequest.createdAt {
+                        Text(date, style: .date)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+
+                Spacer()
             }
 
-            // Body content
+            // Content
             MarkdownText(content: body)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 12)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - Comments Section
+
     private var commentsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header
+            if !comments.isEmpty || isLoading {
+                Text("Comments")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 4)
+                    .padding(.top, 8)
+            }
+
             if isLoading {
                 HStack {
                     Spacer()
                     ProgressView()
-                        .padding(.vertical, 24)
+                        .padding(.vertical, 20)
                     Spacer()
                 }
             } else if comments.isEmpty {
-                Text("No comments")
+                Text("No comments yet")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                    .padding(.vertical, 20)
             } else {
-                ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
+                ForEach(comments) { comment in
                     CommentView(comment: comment)
-                    if index < comments.count - 1 {
-                        Divider()
-                    }
                 }
             }
         }
     }
 
-    private var addCommentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    // MARK: - Comment Input
+
+    private var commentInputBar: some View {
+        VStack(spacing: 0) {
             Divider()
 
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 TextField("Add a comment...", text: $newComment, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .lineLimit(1...6)
+                    .lineLimit(1...5)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
                     .focused($isCommentFocused)
 
                 Button {
                     Task { await submitComment() }
                 } label: {
-                    if isSubmitting {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(newComment.isEmpty ? Color.gray : Color.accentColor)
+                    Group {
+                        if isSubmitting {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 28))
+                        }
                     }
+                    .foregroundStyle(newComment.isEmpty ? Color(.systemGray4) : Color.accentColor)
                 }
                 .disabled(newComment.isEmpty || isSubmitting)
             }
-            .padding(12)
-            .background(Color(.tertiarySystemFill))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(.bar)
         }
     }
 
+    // MARK: - Actions
+
     private func loadComments() async {
         isLoading = true
-
         do {
             comments = try await pullRequestService.getComments(
                 owner: owner,
@@ -223,7 +268,6 @@ struct PullRequestDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
-
         isLoading = false
     }
 
