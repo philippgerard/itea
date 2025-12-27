@@ -9,7 +9,7 @@ struct MarkdownText: View {
 
     var body: some View {
         Markdown(content)
-            .markdownTheme(.gitHub)
+            .markdownTheme(.basic)
             .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { url in
                 // Try to handle as internal Gitea link
