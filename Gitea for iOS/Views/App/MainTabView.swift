@@ -3,6 +3,7 @@ import SwiftUI
 enum NavigationItem: String, CaseIterable, Identifiable {
     case repositories
     case notifications
+    case search
     case settings
 
     var id: String { rawValue }
@@ -11,6 +12,7 @@ enum NavigationItem: String, CaseIterable, Identifiable {
         switch self {
         case .repositories: "Repositories"
         case .notifications: "Notifications"
+        case .search: "Search"
         case .settings: "Settings"
         }
     }
@@ -19,6 +21,7 @@ enum NavigationItem: String, CaseIterable, Identifiable {
         switch self {
         case .repositories: "folder"
         case .notifications: "bell"
+        case .search: "magnifyingglass"
         case .settings: "gear"
         }
     }
@@ -27,17 +30,30 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 struct MainTabView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @Environment(DeepLinkHandler.self) private var deepLinkHandler: DeepLinkHandler?
-    @State private var selectedTab = 0
+    @State private var selectedTab: NavigationItem = .repositories
     @State private var selectedItem: NavigationItem? = .repositories
     @State private var showCreatePRSheet = false
     @State private var pendingPRAction: DeepLinkAction?
 
-    private var apiClient: APIClient? {
+    // Stable services - created once to prevent view recreation
+    @State private var repositoryService: RepositoryService?
+    @State private var notificationService: NotificationService?
+    @State private var issueService: IssueService?
+    @State private var pullRequestService: PullRequestService?
+
+    private func setupServices() {
+        guard repositoryService == nil else { return }
+
         guard let serverURL = authManager.getServerURL(),
               let token = authManager.getAccessToken() else {
-            return nil
+            return
         }
-        return APIClient(baseURL: serverURL, tokenProvider: { token })
+
+        let apiClient = APIClient(baseURL: serverURL, tokenProvider: { token })
+        repositoryService = RepositoryService(apiClient: apiClient)
+        notificationService = NotificationService(apiClient: apiClient)
+        issueService = IssueService(apiClient: apiClient)
+        pullRequestService = PullRequestService(apiClient: apiClient)
     }
 
     var body: some View {
@@ -49,6 +65,9 @@ struct MainTabView: View {
             tabNavigation
             #endif
         }
+        .task {
+            setupServices()
+        }
         .onChange(of: deepLinkHandler?.pendingAction) { _, newAction in
             if case .createPullRequest = newAction {
                 pendingPRAction = newAction
@@ -57,13 +76,13 @@ struct MainTabView: View {
             }
         }
         .sheet(isPresented: $showCreatePRSheet) {
-            if let apiClient,
+            if let pullRequestService, let repositoryService,
                case let .createPullRequest(owner, repo, base, head, title, body) = pendingPRAction {
                 CreatePullRequestView(
                     owner: owner,
                     repo: repo,
-                    pullRequestService: PullRequestService(apiClient: apiClient),
-                    repositoryService: RepositoryService(apiClient: apiClient),
+                    pullRequestService: pullRequestService,
+                    repositoryService: repositoryService,
                     onCreated: { },
                     initialTitle: title,
                     initialBody: body,
@@ -89,6 +108,8 @@ struct MainTabView: View {
             }
             .navigationTitle("iTea")
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(.ultraThinMaterial)
         } detail: {
             if let selectedItem {
                 destinationView(for: selectedItem)
@@ -106,12 +127,26 @@ struct MainTabView: View {
     private func destinationView(for item: NavigationItem) -> some View {
         switch item {
         case .repositories:
-            if let apiClient {
-                RepositoryListView(repositoryService: RepositoryService(apiClient: apiClient))
+            if let repositoryService {
+                RepositoryListView(repositoryService: repositoryService)
+            } else {
+                ProgressView()
             }
         case .notifications:
-            if let apiClient {
-                NotificationListView(notificationService: NotificationService(apiClient: apiClient))
+            if let notificationService {
+                NotificationListView(notificationService: notificationService)
+            } else {
+                ProgressView()
+            }
+        case .search:
+            if let repositoryService, let issueService, let pullRequestService {
+                SearchView(
+                    repositoryService: repositoryService,
+                    issueService: issueService,
+                    pullRequestService: pullRequestService
+                )
+            } else {
+                ProgressView()
             }
         case .settings:
             SettingsView()
@@ -122,21 +157,35 @@ struct MainTabView: View {
 
     private var tabNavigation: some View {
         TabView(selection: $selectedTab) {
-            Tab("Repositories", systemImage: "folder", value: 0) {
-                if let apiClient {
-                    RepositoryListView(repositoryService: RepositoryService(apiClient: apiClient))
+            if let repositoryService, let notificationService, let issueService, let pullRequestService {
+                RepositoryListView(repositoryService: repositoryService)
+                    .tabItem {
+                        SwiftUI.Label("Repositories", systemImage: "folder")
+                    }
+                    .tag(NavigationItem.repositories)
+
+                NotificationListView(notificationService: notificationService)
+                    .tabItem {
+                        SwiftUI.Label("Notifications", systemImage: "bell")
+                    }
+                    .tag(NavigationItem.notifications)
+
+                SearchView(
+                    repositoryService: repositoryService,
+                    issueService: issueService,
+                    pullRequestService: pullRequestService
+                )
+                .tabItem {
+                    SwiftUI.Label("Search", systemImage: "magnifyingglass")
                 }
+                .tag(NavigationItem.search)
             }
 
-            Tab("Notifications", systemImage: "bell", value: 1) {
-                if let apiClient {
-                    NotificationListView(notificationService: NotificationService(apiClient: apiClient))
+            SettingsView()
+                .tabItem {
+                    SwiftUI.Label("Settings", systemImage: "gear")
                 }
-            }
-
-            Tab("Settings", systemImage: "gear", value: 2) {
-                SettingsView()
-            }
+                .tag(NavigationItem.settings)
         }
     }
 }

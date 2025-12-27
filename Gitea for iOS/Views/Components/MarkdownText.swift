@@ -138,7 +138,7 @@ extension Theme {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGray6))
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .markdownMargin(top: 8, bottom: 8)
         }
@@ -178,7 +178,7 @@ extension Theme {
             configuration.label
                 .markdownMargin(top: 8, bottom: 8)
                 .markdownTableBorderStyle(.init(color: .clear))
-                .markdownTableBackgroundStyle(.alternatingRows(Color(.systemGray6), .clear))
+                .markdownTableBackgroundStyle(.alternatingRows(Color(.tertiarySystemFill), .clear))
         }
         .tableCell { configuration in
             configuration.label

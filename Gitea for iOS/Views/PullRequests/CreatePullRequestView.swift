@@ -70,7 +70,7 @@ struct CreatePullRequestView: View {
                         } else {
                             VStack(spacing: 12) {
                                 HStack {
-                                    Text("Head branch")
+                                    Text("Source branch")
                                         .frame(width: 100, alignment: .leading)
                                     Picker("", selection: $headBranch) {
                                         Text("Select branch").tag("")
@@ -82,7 +82,7 @@ struct CreatePullRequestView: View {
                                 }
 
                                 HStack {
-                                    Text("Base branch")
+                                    Text("Target branch")
                                         .frame(width: 100, alignment: .leading)
                                     Picker("", selection: $baseBranch) {
                                         Text("Select branch").tag("")
@@ -129,15 +129,18 @@ struct CreatePullRequestView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                .buttonStyle(.bordered)
                 .keyboardShortcut(.cancelAction)
 
                 Button("Create Pull Request") {
                     Task { await createPullRequest() }
                 }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!isFormValid || isSubmitting)
             }
             .padding(20)
+            .background(.ultraThinMaterial)
         }
         .frame(minWidth: 540, minHeight: 520)
         .alert("Error", isPresented: $showError) {
@@ -163,14 +166,14 @@ struct CreatePullRequestView: View {
                             Spacer()
                         }
                     } else {
-                        Picker("Head branch", selection: $headBranch) {
+                        Picker("Source branch", selection: $headBranch) {
                             Text("Select branch").tag("")
                             ForEach(branches) { branch in
                                 Text(branch.name).tag(branch.name)
                             }
                         }
 
-                        Picker("Base branch", selection: $baseBranch) {
+                        Picker("Target branch", selection: $baseBranch) {
                             Text("Select branch").tag("")
                             ForEach(branches) { branch in
                                 Text(branch.name).tag(branch.name)
@@ -190,6 +193,7 @@ struct CreatePullRequestView: View {
             }
             .navigationTitle("New Pull Request")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -201,6 +205,7 @@ struct CreatePullRequestView: View {
                     Button("Create") {
                         Task { await createPullRequest() }
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(!isFormValid || isSubmitting)
                 }
             }

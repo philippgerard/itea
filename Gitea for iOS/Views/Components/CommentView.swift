@@ -37,7 +37,7 @@ struct CommentView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }

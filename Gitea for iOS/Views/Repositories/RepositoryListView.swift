@@ -48,6 +48,7 @@ struct RepositoryListView: View {
             }
             .navigationTitle("Repositories")
             .searchable(text: $searchText, prompt: "Search repositories")
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .refreshable {
                 await loadRepositories()
             }

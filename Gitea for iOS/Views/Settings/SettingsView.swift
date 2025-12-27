@@ -13,6 +13,7 @@ struct SettingsView: View {
                 legalSection
             }
             .navigationTitle("Settings")
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
         .confirmationDialog(
             "Sign Out",
@@ -58,12 +59,10 @@ struct SettingsView: View {
             Button(role: .destructive) {
                 showLogoutConfirmation = true
             } label: {
-                HStack {
-                    Spacer()
-                    Text("Sign Out")
-                    Spacer()
-                }
+                Text("Sign Out")
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.bordered)
         }
     }
 
@@ -144,6 +143,7 @@ struct LicensesView: View {
             }
         }
         .navigationTitle("Licenses")
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         #if !targetEnvironment(macCatalyst)
         .navigationBarTitleDisplayMode(.inline)
         #endif

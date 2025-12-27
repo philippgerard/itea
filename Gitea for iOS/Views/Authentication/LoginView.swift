@@ -50,7 +50,7 @@ struct LoginView: View {
                                 .keyboardType(.URL)
                                 #endif
                                 .padding(12)
-                                .background(Color(.systemGray6))
+                                .background(.ultraThinMaterial)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
 
@@ -78,7 +78,7 @@ struct LoginView: View {
                                 .textFieldStyle(.plain)
                                 .textContentType(.password)
                                 .padding(12)
-                                .background(Color(.systemGray6))
+                                .background(.ultraThinMaterial)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
 
@@ -89,7 +89,6 @@ struct LoginView: View {
                             Group {
                                 if isLoading {
                                     ProgressView()
-                                        .tint(.white)
                                 } else {
                                     Text("Sign In")
                                         .fontWeight(.semibold)
@@ -97,18 +96,14 @@ struct LoginView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(isFormValid ? Color.accentColor : Color(.systemGray4))
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .disabled(!isFormValid || isLoading)
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderedProminent)
                         .padding(.top, 8)
                     }
                     .padding(24)
-                    .background(Color(.systemBackground))
+                    .background(.regularMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
                     .frame(maxWidth: 400)
 
                     // Help link
@@ -199,18 +194,20 @@ struct TokenInfoSheet: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding()
-                    .background(Color.orange.opacity(0.1))
+                    .background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .padding(24)
             }
             .navigationTitle("Access Token")
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             #if !targetEnvironment(macCatalyst)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .buttonStyle(.bordered)
                 }
             }
         }

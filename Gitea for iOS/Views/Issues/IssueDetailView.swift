@@ -5,13 +5,26 @@ struct IssueDetailView: View {
     let owner: String
     let repo: String
     let issueService: IssueService
+    var onIssueUpdated: ((Issue) -> Void)?
 
+    @State private var currentIssue: Issue
     @State private var comments: [Comment] = []
     @State private var isLoading = false
     @State private var newComment = ""
     @State private var isSubmitting = false
+    @State private var isTogglingState = false
     @State private var errorMessage: String?
+    @State private var showError = false
     @FocusState private var isCommentFocused: Bool
+
+    init(issue: Issue, owner: String, repo: String, issueService: IssueService, onIssueUpdated: ((Issue) -> Void)? = nil) {
+        self.issue = issue
+        self.owner = owner
+        self.repo = repo
+        self.issueService = issueService
+        self.onIssueUpdated = onIssueUpdated
+        self._currentIssue = State(initialValue: issue)
+    }
 
     var body: some View {
         ScrollView {
@@ -20,7 +33,7 @@ struct IssueDetailView: View {
                 headerCard
 
                 // Body card (if has body)
-                if let body = issue.body, !body.isEmpty {
+                if let body = currentIssue.body, !body.isEmpty {
                     bodyCard(body)
                 }
 
@@ -31,14 +44,42 @@ struct IssueDetailView: View {
             .padding(.top, 8)
             .padding(.bottom, 100) // Space for input
         }
-        .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) {
             commentInputBar
         }
-        .navigationTitle("#\(issue.number)")
+        .navigationTitle("#\(currentIssue.number)")
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         #if !targetEnvironment(macCatalyst)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button {
+                        Task { await toggleIssueState() }
+                    } label: {
+                        if currentIssue.isOpen {
+                            SwiftUI.Label("Close Issue", systemImage: "xmark.circle")
+                        } else {
+                            SwiftUI.Label("Reopen Issue", systemImage: "arrow.uturn.left.circle")
+                        }
+                    }
+                    .disabled(isTogglingState)
+                } label: {
+                    if isTogglingState {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Unknown error")
+        }
         .task {
             await loadComments()
         }
@@ -49,25 +90,25 @@ struct IssueDetailView: View {
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Title
-            Text(issue.title)
+            Text(currentIssue.title)
                 .font(.headline)
 
             // Status row
             HStack(spacing: 8) {
                 // Status badge
                 HStack(spacing: 4) {
-                    Image(systemName: issue.isOpen ? "circle.fill" : "checkmark.circle.fill")
+                    Image(systemName: currentIssue.isOpen ? "circle.fill" : "checkmark.circle.fill")
                         .font(.system(size: 8))
-                    Text(issue.isOpen ? "Open" : "Closed")
+                    Text(currentIssue.isOpen ? "Open" : "Closed")
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
-                .foregroundStyle(issue.isOpen ? .green : .purple)
+                .foregroundStyle(currentIssue.isOpen ? .green : .purple)
 
                 Text("·")
                     .foregroundStyle(.quaternary)
 
-                if let date = issue.createdAt {
+                if let date = currentIssue.createdAt {
                     Text(date, style: .relative)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -77,7 +118,7 @@ struct IssueDetailView: View {
             }
 
             // Labels
-            if issue.hasLabels, let labels = issue.labels {
+            if currentIssue.hasLabels, let labels = currentIssue.labels {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(labels) { label in
@@ -89,7 +130,7 @@ struct IssueDetailView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -99,14 +140,14 @@ struct IssueDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             // Author row
             HStack(spacing: 10) {
-                UserAvatarView(user: issue.user, size: 32)
+                UserAvatarView(user: currentIssue.user, size: 32)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(issue.user.displayName)
+                    Text(currentIssue.user.displayName)
                         .font(.subheadline)
                         .fontWeight(.medium)
 
-                    if let date = issue.createdAt {
+                    if let date = currentIssue.createdAt {
                         Text(date, style: .date)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -121,7 +162,7 @@ struct IssueDetailView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -157,45 +198,55 @@ struct IssueDetailView: View {
                 ForEach(comments) { comment in
                     CommentView(comment: comment)
                 }
+
+                // End of thread indicator
+                endOfThreadIndicator
             }
         }
+    }
+
+    private var endOfThreadIndicator: some View {
+        HStack(spacing: 12) {
+            VStack { Divider() }
+            Text("End of conversation")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            VStack { Divider() }
+        }
+        .padding(.vertical, 16)
     }
 
     // MARK: - Comment Input
 
     private var commentInputBar: some View {
-        VStack(spacing: 0) {
-            Divider()
+        HStack(alignment: .bottom, spacing: 12) {
+            TextField("Add a comment...", text: $newComment, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(2...6)
+                .padding(12)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .focused($isCommentFocused)
 
-            VStack(alignment: .trailing, spacing: 10) {
-                TextField("Add a comment...", text: $newComment, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(2...6)
-                    .padding(12)
-                    .background(Color(.tertiarySystemFill))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .focused($isCommentFocused)
-
-                Button {
-                    Task { await submitComment() }
-                } label: {
-                    if isSubmitting {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 60)
-                    } else {
-                        Text("Save")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
+            Button {
+                Task { await submitComment() }
+            } label: {
+                if isSubmitting {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "paperplane.fill")
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(newComment.isEmpty || isSubmitting)
             }
-            .padding()
-            .background(.bar)
+            .font(.body)
+            .frame(width: 44, height: 44)
+            .background(newComment.isEmpty ? Color.secondary.opacity(0.2) : Color.accentColor)
+            .foregroundStyle(newComment.isEmpty ? Color.secondary : Color.white)
+            .clipShape(Circle())
+            .disabled(newComment.isEmpty || isSubmitting)
         }
+        .padding()
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Actions
@@ -206,10 +257,11 @@ struct IssueDetailView: View {
             comments = try await issueService.getComments(
                 owner: owner,
                 repo: repo,
-                issueIndex: issue.number
+                issueIndex: currentIssue.number
             )
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
         isLoading = false
     }
@@ -222,15 +274,44 @@ struct IssueDetailView: View {
             let comment = try await issueService.createComment(
                 owner: owner,
                 repo: repo,
-                issueIndex: issue.number,
+                issueIndex: currentIssue.number,
                 body: newComment
             )
             comments.append(comment)
             newComment = ""
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
 
         isSubmitting = false
+    }
+
+    private func toggleIssueState() async {
+        isTogglingState = true
+
+        do {
+            let updatedIssue: Issue
+            if currentIssue.isOpen {
+                updatedIssue = try await issueService.closeIssue(
+                    owner: owner,
+                    repo: repo,
+                    index: currentIssue.number
+                )
+            } else {
+                updatedIssue = try await issueService.reopenIssue(
+                    owner: owner,
+                    repo: repo,
+                    index: currentIssue.number
+                )
+            }
+            currentIssue = updatedIssue
+            onIssueUpdated?(updatedIssue)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+
+        isTogglingState = false
     }
 }

@@ -1,5 +1,8 @@
 import Foundation
 
+/// Empty response type for API calls that return no body
+struct EmptyResponse: Codable, Sendable {}
+
 enum HTTPMethod: String {
     case get = "GET"
     case post = "POST"
@@ -160,6 +163,40 @@ struct APIEndpoint: Sendable {
         )
     }
 
+    static func updatePullRequest(owner: String, repo: String, index: Int, title: String? = nil, body: String? = nil, state: String? = nil) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/pulls/\(index)",
+            method: .patch,
+            body: UpdatePullRequestBody(title: title, body: body, state: state)
+        )
+    }
+
+    static func mergePullRequest(owner: String, repo: String, index: Int, method: MergeMethod = .merge, message: String? = nil) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/pulls/\(index)/merge",
+            method: .post,
+            body: MergePullRequestBody(do: method.rawValue, mergeMessageField: message)
+        )
+    }
+
+    // MARK: - Commit Status Endpoints
+
+    static func commitStatus(owner: String, repo: String, sha: String) -> APIEndpoint {
+        APIEndpoint(path: "/repos/\(owner)/\(repo)/commits/\(sha)/status")
+    }
+
+    // MARK: - Actions Endpoints
+
+    static func actionRuns(owner: String, repo: String, page: Int = 1, limit: Int = 20) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/actions/runs",
+            queryItems: [
+                URLQueryItem(name: "page", value: "\(page)"),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+    }
+
     // MARK: - Notification Endpoints
 
     static func notifications(all: Bool = false, page: Int = 1, limit: Int = 20) -> APIEndpoint {
@@ -210,4 +247,37 @@ struct CreatePullRequestBody: Encodable, Sendable {
     let body: String
     let head: String
     let base: String
+}
+
+struct UpdatePullRequestBody: Encodable, Sendable {
+    let title: String?
+    let body: String?
+    let state: String?
+}
+
+struct MergePullRequestBody: Encodable, Sendable {
+    let `do`: String
+    let mergeMessageField: String?
+
+    enum CodingKeys: String, CodingKey {
+        case `do` = "Do"
+        case mergeMessageField = "merge_message_field"
+    }
+}
+
+/// Available merge methods for pull requests
+enum MergeMethod: String, Sendable {
+    case merge
+    case rebase
+    case squash
+    case fastForwardOnly = "fast-forward-only"
+
+    var displayName: String {
+        switch self {
+        case .merge: return "Merge commit"
+        case .rebase: return "Rebase"
+        case .squash: return "Squash"
+        case .fastForwardOnly: return "Fast-forward"
+        }
+    }
 }

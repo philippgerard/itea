@@ -36,6 +36,7 @@ struct NotificationListView: View {
                 }
             }
             .navigationTitle("Notifications")
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -49,6 +50,7 @@ struct NotificationListView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
+                    .buttonStyle(.bordered)
                 }
             }
             .refreshable {

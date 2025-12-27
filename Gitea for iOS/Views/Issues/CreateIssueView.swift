@@ -75,15 +75,18 @@ struct CreateIssueView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                .buttonStyle(.bordered)
                 .keyboardShortcut(.cancelAction)
 
                 Button("Create Issue") {
                     Task { await createIssue() }
                 }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(title.isEmpty || isSubmitting)
             }
             .padding(20)
+            .background(.ultraThinMaterial)
         }
         .frame(minWidth: 500, minHeight: 450)
         .alert("Error", isPresented: $showError) {
@@ -109,6 +112,7 @@ struct CreateIssueView: View {
             }
             .navigationTitle("New Issue")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -120,6 +124,7 @@ struct CreateIssueView: View {
                     Button("Create") {
                         Task { await createIssue() }
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(title.isEmpty || isSubmitting)
                 }
             }

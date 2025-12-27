@@ -23,6 +23,16 @@ final class IssueService: Sendable {
         try await apiClient.request(.updateIssue(owner: owner, repo: repo, index: index, title: title, body: body, state: state))
     }
 
+    /// Closes an open issue
+    func closeIssue(owner: String, repo: String, index: Int) async throws -> Issue {
+        try await updateIssue(owner: owner, repo: repo, index: index, state: "closed")
+    }
+
+    /// Reopens a closed issue
+    func reopenIssue(owner: String, repo: String, index: Int) async throws -> Issue {
+        try await updateIssue(owner: owner, repo: repo, index: index, state: "open")
+    }
+
     func getComments(owner: String, repo: String, issueIndex: Int, page: Int = 1) async throws -> [Comment] {
         try await apiClient.request(.issueComments(owner: owner, repo: repo, index: issueIndex, page: page))
     }

@@ -23,7 +23,7 @@ struct IssueListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Filter picker always visible
+            // Filter picker with glass background
             Picker("State", selection: $selectedState) {
                 ForEach(IssueState.allCases, id: \.self) { state in
                     Text(state.displayName).tag(state)
@@ -31,6 +31,7 @@ struct IssueListView: View {
             }
             .pickerStyle(.segmented)
             .padding()
+            .background(.ultraThinMaterial)
 
             if isLoading && issues.isEmpty {
                 Spacer()
@@ -66,8 +67,10 @@ struct IssueListView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .buttonStyle(.bordered)
             }
         }
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .sheet(isPresented: $showCreateIssue) {
             CreateIssueView(owner: owner, repo: repo, issueService: issueService) {
                 Task { await loadIssues() }

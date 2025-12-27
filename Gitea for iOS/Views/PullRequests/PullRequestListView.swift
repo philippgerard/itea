@@ -24,7 +24,7 @@ struct PullRequestListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Filter picker always visible
+            // Filter picker with glass background
             Picker("State", selection: $selectedState) {
                 ForEach(PRState.allCases, id: \.self) { state in
                     Text(state.displayName).tag(state)
@@ -32,6 +32,7 @@ struct PullRequestListView: View {
             }
             .pickerStyle(.segmented)
             .padding()
+            .background(.ultraThinMaterial)
 
             if isLoading && pullRequests.isEmpty {
                 Spacer()
@@ -67,8 +68,10 @@ struct PullRequestListView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .buttonStyle(.bordered)
             }
         }
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .sheet(isPresented: $showCreatePR) {
             CreatePullRequestView(
                 owner: owner,

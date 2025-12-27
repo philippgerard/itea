@@ -6,14 +6,8 @@ struct RepositoryDetailView: View {
 
     @EnvironmentObject var authManager: AuthenticationManager
     @State private var selectedSection = 0
-
-    private var apiClient: APIClient? {
-        guard let serverURL = authManager.getServerURL(),
-              let token = authManager.getAccessToken() else {
-            return nil
-        }
-        return APIClient(baseURL: serverURL, tokenProvider: { token })
-    }
+    @State private var issueService: IssueService?
+    @State private var pullRequestService: PullRequestService?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,31 +19,52 @@ struct RepositoryDetailView: View {
             }
             .pickerStyle(.segmented)
             .padding()
+            .background(.ultraThinMaterial)
 
-            if let apiClient {
+            if let issueService, let pullRequestService {
                 switch selectedSection {
                 case 0:
                     IssueListView(
                         owner: repository.ownerName,
                         repo: repository.repoName,
-                        issueService: IssueService(apiClient: apiClient)
+                        issueService: issueService
                     )
                 case 1:
                     PullRequestListView(
                         owner: repository.ownerName,
                         repo: repository.repoName,
-                        pullRequestService: PullRequestService(apiClient: apiClient),
+                        pullRequestService: pullRequestService,
                         repositoryService: repositoryService
                     )
                 default:
                     EmptyView()
                 }
+            } else {
+                ProgressView()
+                    .frame(maxHeight: .infinity)
             }
         }
         .navigationTitle(repository.name)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         #if !targetEnvironment(macCatalyst)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .task {
+            setupServices()
+        }
+    }
+
+    private func setupServices() {
+        guard issueService == nil else { return }
+
+        guard let serverURL = authManager.getServerURL(),
+              let token = authManager.getAccessToken() else {
+            return
+        }
+
+        let apiClient = APIClient(baseURL: serverURL, tokenProvider: { token })
+        issueService = IssueService(apiClient: apiClient)
+        pullRequestService = PullRequestService(apiClient: apiClient)
     }
 
     private var repositoryHeader: some View {
@@ -90,7 +105,7 @@ struct RepositoryDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(.systemGroupedBackground))
+        .background(.regularMaterial)
     }
 }
 
