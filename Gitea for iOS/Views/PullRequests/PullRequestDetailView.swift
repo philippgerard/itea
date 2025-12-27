@@ -223,34 +223,33 @@ struct PullRequestDetailView: View {
         VStack(spacing: 0) {
             Divider()
 
-            HStack(alignment: .bottom, spacing: 10) {
+            VStack(alignment: .trailing, spacing: 10) {
                 TextField("Add a comment...", text: $newComment, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .lineLimit(1...5)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .lineLimit(2...6)
+                    .padding(12)
                     .background(Color(.tertiarySystemFill))
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                     .focused($isCommentFocused)
 
                 Button {
                     Task { await submitComment() }
                 } label: {
-                    Group {
-                        if isSubmitting {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 28))
-                        }
+                    if isSubmitting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 60)
+                    } else {
+                        Text("Save")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                     }
-                    .foregroundStyle(newComment.isEmpty ? Color(.systemGray4) : Color.accentColor)
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
                 .disabled(newComment.isEmpty || isSubmitting)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            .padding()
             .background(.bar)
         }
     }
