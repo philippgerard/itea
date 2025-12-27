@@ -48,8 +48,9 @@ struct MarkdownText: View {
 
 extension Theme {
     @MainActor static let iTea = Theme()
-        // Base text styling
+        // Base text styling - use system font to match app
         .text {
+            FontFamily(.system())
             ForegroundColor(.primary)
             FontSize(15)
         }
