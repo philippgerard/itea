@@ -4,67 +4,55 @@ struct PullRequestRowView: View {
     let pullRequest: PullRequest
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                statusIcon
-                    .padding(.top, 4)
+        HStack(alignment: .top, spacing: 10) {
+            statusIcon
+                .padding(.top, 5)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(pullRequest.title)
-                        .font(.headline)
-                        .lineLimit(2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(pullRequest.title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .lineLimit(2)
 
-                    HStack(spacing: 8) {
-                        Text("#\(pullRequest.number)")
-                            .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("#\(pullRequest.number)")
 
-                        Text("by \(pullRequest.user.displayName)")
-                            .foregroundStyle(.secondary)
+                    Text("·")
 
-                        if let comments = pullRequest.comments, comments > 0 {
-                            SwiftUI.Label("\(comments)", systemImage: "bubble.right")
-                                .foregroundStyle(.secondary)
-                        }
+                    Text(pullRequest.user.displayName)
+
+                    if let comments = pullRequest.comments, comments > 0 {
+                        Text("·")
+                        Image(systemName: "bubble.right")
+                        Text("\(comments)")
                     }
-                    .font(.caption)
 
-                    if let head = pullRequest.head, let base = pullRequest.base {
-                        HStack(spacing: 4) {
-                            Text(head.ref)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.1))
-                                .foregroundStyle(.blue)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                            Image(systemName: "arrow.right")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-
-                            Text(base.ref)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.1))
-                                .foregroundStyle(.green)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                    if pullRequest.hasLabels, let labels = pullRequest.labels {
+                        ForEach(labels.prefix(3)) { label in
+                            Text("·")
+                            Text(label.name)
+                                .foregroundStyle(label.uiColor)
                         }
                     }
                 }
-            }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
 
-            if pullRequest.hasLabels, let labels = pullRequest.labels {
-                ScrollView(.horizontal, showsIndicators: false) {
+                if let head = pullRequest.head, let base = pullRequest.base {
                     HStack(spacing: 4) {
-                        ForEach(labels) { label in
-                            LabelTagView(label: label)
-                        }
+                        Text(head.ref)
+                            .foregroundStyle(.blue)
+                        Image(systemName: "arrow.right")
+                        Text(base.ref)
+                            .foregroundStyle(.green)
                     }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 
     private var statusIcon: some View {
@@ -80,7 +68,7 @@ struct PullRequestRowView: View {
                     .foregroundStyle(.red)
             }
         }
-        .font(.caption)
+        .font(.system(size: 10))
     }
 }
 

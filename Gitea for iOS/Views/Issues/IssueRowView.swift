@@ -4,45 +4,45 @@ struct IssueRowView: View {
     let issue: Issue
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: issue.isOpen ? "circle.fill" : "checkmark.circle.fill")
-                    .foregroundStyle(issue.isOpen ? .green : .purple)
-                    .font(.caption)
-                    .padding(.top, 4)
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: issue.isOpen ? "circle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(issue.isOpen ? .green : .purple)
+                .font(.system(size: 8))
+                .padding(.top, 6)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(issue.title)
-                        .font(.headline)
-                        .lineLimit(2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(issue.title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .lineLimit(2)
 
-                    HStack(spacing: 8) {
-                        Text("#\(issue.number)")
-                            .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("#\(issue.number)")
 
-                        Text("by \(issue.user.displayName)")
-                            .foregroundStyle(.secondary)
+                    Text("·")
 
-                        if let comments = issue.comments, comments > 0 {
-                            SwiftUI.Label("\(comments)", systemImage: "bubble.right")
-                                .foregroundStyle(.secondary)
-                        }
+                    Text(issue.user.displayName)
+
+                    if let comments = issue.comments, comments > 0 {
+                        Text("·")
+                        Image(systemName: "bubble.right")
+                        Text("\(comments)")
                     }
-                    .font(.caption)
-                }
-            }
 
-            if issue.hasLabels, let labels = issue.labels {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(labels) { label in
-                            LabelTagView(label: label)
+                    if issue.hasLabels, let labels = issue.labels {
+                        ForEach(labels.prefix(3)) { label in
+                            Text("·")
+                            Text(label.name)
+                                .foregroundStyle(label.uiColor)
                         }
                     }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 
