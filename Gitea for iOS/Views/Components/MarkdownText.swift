@@ -9,16 +9,14 @@ struct MarkdownText: View {
 
     var body: some View {
         Markdown(content)
-            .markdownTheme(.appTheme)
+            .markdownTheme(.subtle)
             .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { url in
-                // Try to handle as internal Gitea link
                 if let deepLinkHandler,
                    let serverURL = authManager.getServerURL(),
                    deepLinkHandler.handleURL(url, serverURL: serverURL) {
                     return .handled
                 }
-                // Otherwise open in default browser
                 return .systemAction
             })
     }
@@ -36,10 +34,6 @@ struct MarkdownText: View {
             - List item 1
             - List item 2
 
-            | Column 1 | Column 2 |
-            |----------|----------|
-            | Cell 1   | Cell 2   |
-
             - [ ] Task 1
             - [x] Task 2 (done)
             """)
@@ -49,67 +43,89 @@ struct MarkdownText: View {
     .environmentObject(AuthenticationManager())
 }
 
+// A restrained theme that doesn't fight the UI
 extension Theme {
-    @MainActor static let appTheme = Theme()
+    @MainActor static let subtle = Theme()
+        // Body text: inherit system font
         .text {
-            FontSize(.em(1))
+            ForegroundColor(.primary)
         }
+        // Paragraphs: tight, no excess space
         .paragraph { configuration in
             configuration.label
-                .markdownMargin(top: 0, bottom: 8)
+                .markdownMargin(top: 0, bottom: 4)
         }
+        // h1: bold, same size - let context provide hierarchy
         .heading1 { configuration in
-            configuration.label
-                .markdownMargin(top: 16, bottom: 8)
-                .markdownTextStyle {
-                    FontWeight(.semibold)
-                    FontSize(.em(1.5))
-                }
-        }
-        .heading2 { configuration in
-            configuration.label
-                .markdownMargin(top: 12, bottom: 6)
-                .markdownTextStyle {
-                    FontWeight(.semibold)
-                    FontSize(.em(1.25))
-                }
-        }
-        .heading3 { configuration in
             configuration.label
                 .markdownMargin(top: 8, bottom: 4)
                 .markdownTextStyle {
-                    FontWeight(.medium)
-                    FontSize(.em(1.1))
+                    FontWeight(.semibold)
                 }
         }
+        // h2: semibold, same size
+        .heading2 { configuration in
+            configuration.label
+                .markdownMargin(top: 6, bottom: 2)
+                .markdownTextStyle {
+                    FontWeight(.semibold)
+                }
+        }
+        // h3: medium weight, same size
+        .heading3 { configuration in
+            configuration.label
+                .markdownMargin(top: 4, bottom: 2)
+                .markdownTextStyle {
+                    FontWeight(.medium)
+                }
+        }
+        // Inline code: subtle
         .code {
             FontFamilyVariant(.monospaced)
             FontSize(.em(0.9))
-            BackgroundColor(Color(.tertiarySystemFill))
         }
+        // Code blocks: minimal
         .codeBlock { configuration in
-            configuration.label
-                .markdownTextStyle {
-                    FontFamilyVariant(.monospaced)
-                    FontSize(.em(0.85))
-                }
-                .padding(12)
-                .background(Color(.tertiarySystemFill))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .markdownMargin(top: 8, bottom: 8)
+            ScrollView(.horizontal, showsIndicators: false) {
+                configuration.label
+                    .markdownTextStyle {
+                        FontFamilyVariant(.monospaced)
+                        FontSize(.em(0.85))
+                    }
+            }
+            .padding(10)
+            .background(Color(.tertiarySystemFill))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .markdownMargin(top: 4, bottom: 4)
         }
+        // Blockquotes: subtle left accent
         .blockquote { configuration in
             configuration.label
-                .padding(.leading, 12)
+                .markdownTextStyle {
+                    ForegroundColor(.secondary)
+                }
+                .padding(.leading, 10)
                 .overlay(alignment: .leading) {
                     Rectangle()
-                        .fill(Color.secondary.opacity(0.5))
-                        .frame(width: 3)
+                        .fill(Color.secondary.opacity(0.3))
+                        .frame(width: 2)
                 }
-                .markdownMargin(top: 8, bottom: 8)
+                .markdownMargin(top: 4, bottom: 4)
         }
+        // Lists: tight
         .listItem { configuration in
             configuration.label
-                .markdownMargin(top: 2, bottom: 2)
+                .markdownMargin(top: 1, bottom: 1)
+        }
+        // Task lists: subtle checkmarks
+        .taskListMarker { configuration in
+            Image(systemName: configuration.isCompleted ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(configuration.isCompleted ? .secondary : .tertiary)
+                .font(.system(size: 14))
+        }
+        // Thematic break (hr): subtle
+        .thematicBreak {
+            Divider()
+                .markdownMargin(top: 8, bottom: 8)
         }
 }

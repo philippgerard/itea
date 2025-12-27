@@ -4,59 +4,87 @@ struct CommentView: View {
     let comment: Comment
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                UserAvatarView(user: comment.user, size: 28)
+        VStack(alignment: .leading, spacing: 8) {
+            // Author line: avatar, name, time - all subtle
+            HStack(spacing: 8) {
+                UserAvatarView(user: comment.user, size: 24)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(comment.user.displayName)
+                Text(comment.user.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Text("·")
+                    .foregroundStyle(.tertiary)
+
+                if let date = comment.createdAt {
+                    Text(date, style: .relative)
                         .font(.subheadline)
-                        .fontWeight(.medium)
-
-                    if let date = comment.createdAt {
-                        Text(date, style: .relative)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                        .foregroundStyle(.secondary)
                 }
 
-                Spacer()
-
                 if comment.isEdited {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
                     Text("edited")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
                 }
             }
 
+            // Content: just the markdown, no container
             MarkdownText(content: comment.body)
-                .font(.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 12)
     }
 }
 
 #Preview {
-    CommentView(
-        comment: Comment(
-            id: 1,
-            body: "This is a test comment with some content to display.",
-            user: User(
+    VStack(spacing: 0) {
+        CommentView(
+            comment: Comment(
                 id: 1,
-                login: "testuser",
-                fullName: "Test User",
-                email: nil,
-                avatarUrl: nil,
-                isAdmin: false,
-                created: nil
-            ),
-            createdAt: Date(),
-            updatedAt: nil
+                body: "This is a short comment.",
+                user: User(
+                    id: 1,
+                    login: "testuser",
+                    fullName: "Test User",
+                    email: nil,
+                    avatarUrl: nil,
+                    isAdmin: false,
+                    created: nil
+                ),
+                createdAt: Date(),
+                updatedAt: nil
+            )
         )
-    )
-    .padding()
+        Divider()
+        CommentView(
+            comment: Comment(
+                id: 2,
+                body: """
+                This is a longer comment with **markdown**.
+
+                ## A heading
+
+                - List item one
+                - List item two
+
+                And some `inline code` too.
+                """,
+                user: User(
+                    id: 2,
+                    login: "another",
+                    fullName: "Another Person",
+                    email: nil,
+                    avatarUrl: nil,
+                    isAdmin: false,
+                    created: nil
+                ),
+                createdAt: Date().addingTimeInterval(-3600),
+                updatedAt: Date()
+            )
+        )
+    }
+    .padding(.horizontal)
 }

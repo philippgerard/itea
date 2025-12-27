@@ -11,18 +11,30 @@ struct PullRequestDetailView: View {
     @State private var newComment = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @FocusState private var isCommentFocused: Bool
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 0) {
                 prHeader
-                branchInfo
-                prBody
+                    .padding(.horizontal)
+                    .padding(.top)
+
+                if let body = pullRequest.body, !body.isEmpty {
+                    prBody(body)
+                        .padding(.horizontal)
+                        .padding(.top, 16)
+                }
+
                 Divider()
+                    .padding(.top, 20)
+
                 commentsSection
+                    .padding(.horizontal)
+
                 addCommentSection
+                    .padding()
             }
-            .padding()
         }
         .navigationTitle("#\(pullRequest.number)")
         #if !targetEnvironment(macCatalyst)
@@ -34,57 +46,77 @@ struct PullRequestDetailView: View {
     }
 
     private var prHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+            // Title
             Text(pullRequest.title)
-                .font(.title2)
+                .font(.title3)
                 .fontWeight(.semibold)
 
-            HStack(spacing: 12) {
-                statusBadge
-
-                Text("#\(pullRequest.number)")
-                    .foregroundStyle(.secondary)
-
-                Spacer()
+            // Status and branch info
+            HStack(spacing: 8) {
+                // Status
+                HStack(spacing: 4) {
+                    Image(systemName: statusIcon)
+                        .font(.system(size: 10))
+                    Text(statusText)
+                }
+                .font(.subheadline)
+                .foregroundStyle(statusColor)
 
                 if let date = pullRequest.createdAt {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
                     Text(date, style: .relative)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
 
+            // Branch info - subtle
+            if let head = pullRequest.head, let base = pullRequest.base {
+                HStack(spacing: 4) {
+                    Text(head.ref)
+                        .foregroundStyle(.blue)
+                    Image(systemName: "arrow.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(base.ref)
+                        .foregroundStyle(.green)
+                }
+                .font(.caption)
+            }
+
+            // Labels - inline, subtle
             if pullRequest.hasLabels, let labels = pullRequest.labels {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(labels) { label in
-                            LabelTagView(label: label)
-                        }
+                HStack(spacing: 6) {
+                    ForEach(labels) { label in
+                        Text(label.name)
+                            .font(.caption)
+                            .foregroundStyle(label.uiColor)
                     }
                 }
             }
         }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private var statusBadge: some View {
-        HStack(spacing: 6) {
-            if pullRequest.isMerged {
-                Image(systemName: "arrow.triangle.merge")
-                Text("Merged")
-            } else if pullRequest.isOpen {
-                Image(systemName: "arrow.triangle.pull")
-                Text("Open")
-            } else {
-                Image(systemName: "xmark.circle.fill")
-                Text("Closed")
-            }
+    private var statusIcon: String {
+        if pullRequest.isMerged {
+            return "arrow.triangle.merge"
+        } else if pullRequest.isOpen {
+            return "arrow.triangle.pull"
+        } else {
+            return "xmark.circle.fill"
         }
-        .font(.subheadline)
-        .fontWeight(.medium)
-        .foregroundStyle(statusColor)
+    }
+
+    private var statusText: String {
+        if pullRequest.isMerged {
+            return "Merged"
+        } else if pullRequest.isOpen {
+            return "Open"
+        } else {
+            return "Closed"
+        }
     }
 
     private var statusColor: Color {
@@ -97,124 +129,85 @@ struct PullRequestDetailView: View {
         }
     }
 
-    private var branchInfo: some View {
-        HStack(spacing: 8) {
-            if let head = pullRequest.head {
-                Text(head.ref)
+    private func prBody(_ body: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Author attribution
+            HStack(spacing: 8) {
+                UserAvatarView(user: pullRequest.user, size: 24)
+
+                Text(pullRequest.user.displayName)
                     .font(.subheadline)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.blue.opacity(0.1))
-                    .foregroundStyle(.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
+                    .fontWeight(.medium)
 
-            Image(systemName: "arrow.right")
-                .foregroundStyle(.secondary)
-
-            if let base = pullRequest.base {
-                Text(base.ref)
-                    .font(.subheadline)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.green.opacity(0.1))
-                    .foregroundStyle(.green)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-
-            Spacer()
-        }
-    }
-
-    private var prBody: some View {
-        Group {
-            if let body = pullRequest.body, !body.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 10) {
-                        UserAvatarView(user: pullRequest.user, size: 32)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(pullRequest.user.displayName)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-
-                            if let date = pullRequest.createdAt {
-                                Text(date, style: .date)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    MarkdownText(content: body)
-                        .font(.body)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                if let date = pullRequest.createdAt {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(date, style: .date)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+
+            // Body content
+            MarkdownText(content: body)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.vertical, 12)
     }
 
     private var commentsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Comments")
-                .font(.headline)
-
+        VStack(alignment: .leading, spacing: 0) {
             if isLoading {
                 HStack {
                     Spacer()
                     ProgressView()
+                        .padding(.vertical, 24)
                     Spacer()
                 }
             } else if comments.isEmpty {
-                Text("No comments yet")
-                    .foregroundStyle(.secondary)
+                Text("No comments")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.vertical, 24)
             } else {
-                ForEach(comments) { comment in
+                ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
                     CommentView(comment: comment)
+                    if index < comments.count - 1 {
+                        Divider()
+                    }
                 }
             }
         }
     }
 
     private var addCommentSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Add a comment")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            Divider()
 
-            TextEditor(text: $newComment)
-                .frame(minHeight: 100)
-                .padding(8)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(.separator), lineWidth: 1)
-                )
+            HStack(alignment: .top, spacing: 10) {
+                TextField("Add a comment...", text: $newComment, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...6)
+                    .focused($isCommentFocused)
 
-            Button {
-                Task { await submitComment() }
-            } label: {
-                HStack {
+                Button {
+                    Task { await submitComment() }
+                } label: {
                     if isSubmitting {
                         ProgressView()
-                            .tint(.white)
+                            .controlSize(.small)
                     } else {
-                        Text("Submit")
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(newComment.isEmpty ? Color.gray : Color.accentColor)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(newComment.isEmpty ? Color.secondary : Color.accentColor)
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .disabled(newComment.isEmpty || isSubmitting)
             }
-            .disabled(newComment.isEmpty || isSubmitting)
+            .padding(12)
+            .background(Color(.tertiarySystemFill))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -236,6 +229,7 @@ struct PullRequestDetailView: View {
 
     private func submitComment() async {
         isSubmitting = true
+        isCommentFocused = false
 
         do {
             let comment = try await pullRequestService.createComment(
