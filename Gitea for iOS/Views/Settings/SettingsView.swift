@@ -96,6 +96,15 @@ struct SettingsView: View {
 
     private var legalSection: some View {
         Section("Legal") {
+            Link(destination: URL(string: "https://github.com/philippgerard/itea/blob/main/PRIVACY.md")!) {
+                HStack {
+                    Text("Privacy Policy")
+                    Spacer()
+                    Image(systemName: "arrow.up.right.square")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             NavigationLink {
                 LicensesView()
             } label: {
