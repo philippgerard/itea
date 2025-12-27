@@ -148,8 +148,10 @@ struct PullRequestDetailView: View {
 
                     MarkdownText(content: body)
                         .font(.body)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding()
+                .frame(maxWidth: .infinity)
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }

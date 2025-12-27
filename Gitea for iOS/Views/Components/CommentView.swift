@@ -31,8 +31,10 @@ struct CommentView: View {
 
             MarkdownText(content: comment.body)
                 .font(.body)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
+        .frame(maxWidth: .infinity)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
