@@ -26,7 +26,7 @@ struct LoginView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
 
-                        Text("A Gitea client for iOS")
+                        Text("A Gitea client")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

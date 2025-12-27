@@ -4,7 +4,7 @@
 
 ## Overview
 
-iTea ("the App") is a mobile client for self-hosted Gitea instances. We are committed to protecting your privacy and being transparent about how the App handles your data.
+iTea ("the App") is a client for self-hosted Gitea instances, available for iOS and macOS. We are committed to protecting your privacy and being transparent about how the App handles your data.
 
 ## Data Collection
 
