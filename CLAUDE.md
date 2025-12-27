@@ -86,8 +86,7 @@ xcodebuild -project "Gitea for iOS.xcodeproj" \
 
 ## Git Notes
 
-- Remote: `ssh://git@gitea.philippgerard.de:2222/philippgerard/itea.git`
-- GitHub mirror: `https://github.com/philippgerard/itea`
+- GitHub: `https://github.com/philippgerard/itea`
 - GPG signing may fail - use `--no-gpg-sign` if needed
 
 ## Adding New Features
