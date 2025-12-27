@@ -7,11 +7,41 @@ struct MarkdownText: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @Environment(DeepLinkHandler.self) private var deepLinkHandler: DeepLinkHandler?
 
+    /// Pre-process content to highlight @mentions as links
+    private var processedContent: String {
+        // Match @username patterns (alphanumeric, underscores, hyphens)
+        // Avoid matching email addresses by requiring word boundary or start
+        let pattern = #"(?<![a-zA-Z0-9.])@([a-zA-Z0-9][-a-zA-Z0-9_]*)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return content
+        }
+
+        let range = NSRange(content.startIndex..., in: content)
+        var result = content
+
+        // Process matches in reverse to preserve indices
+        let matches = regex.matches(in: content, range: range).reversed()
+        for match in matches {
+            guard let fullRange = Range(match.range, in: result),
+                  let usernameRange = Range(match.range(at: 1), in: result) else { continue }
+
+            let username = String(result[usernameRange])
+            let replacement = "[@\(username)](mention:\(username))"
+            result.replaceSubrange(fullRange, with: replacement)
+        }
+
+        return result
+    }
+
     var body: some View {
-        Markdown(content)
+        Markdown(processedContent)
             .markdownTheme(.iTea)
             .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { url in
+                // Handle mention: links (no-op, just visual)
+                if url.scheme == "mention" {
+                    return .handled
+                }
                 if let deepLinkHandler,
                    let serverURL = authManager.getServerURL(),
                    deepLinkHandler.handleURL(url, serverURL: serverURL) {
@@ -27,10 +57,11 @@ struct MarkdownText: View {
         VStack(alignment: .leading, spacing: 24) {
             MarkdownText(content: "Regular paragraph text that flows naturally.")
             MarkdownText(content: "**Bold** and *italic* and `code`")
+            MarkdownText(content: "Hey @claude, can you help with this? cc @username")
             MarkdownText(content: """
             ## Section Header
 
-            Some body text here.
+            Some body text here with @mentions inline.
 
             ### Subsection
 
