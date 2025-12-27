@@ -85,6 +85,10 @@ extension Theme {
             ForegroundColor(.primary)
             FontSize(15)
         }
+        // Links (including @mentions) - accent color
+        .link {
+            ForegroundColor(.accentColor)
+        }
         // Paragraphs with comfortable spacing
         .paragraph { configuration in
             configuration.label
