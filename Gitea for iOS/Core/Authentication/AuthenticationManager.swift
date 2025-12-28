@@ -5,6 +5,7 @@ import SwiftUI
 @Observable
 final class AuthenticationManager: ObservableObject {
     private(set) var isAuthenticated = false
+    private(set) var isCheckingAuth = true
     private(set) var currentUser: User?
     private(set) var serverURL: URL?
 
@@ -18,6 +19,8 @@ final class AuthenticationManager: ObservableObject {
     }
 
     private func loadStoredCredentials() async {
+        defer { isCheckingAuth = false }
+
         guard let credentials = await tokenStorage.load() else { return }
 
         self.serverURL = credentials.serverURL
