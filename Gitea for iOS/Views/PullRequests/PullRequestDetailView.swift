@@ -514,9 +514,10 @@ struct PullRequestDetailView: View {
                         .controlSize(.small)
                 } else {
                     Image(systemName: "paperplane.fill")
+                        .imageScale(.large)
                 }
             }
-            .font(.body)
+            .buttonStyle(.plain)
             .frame(width: 44, height: 44)
             .background(newComment.isEmpty ? Color.secondary.opacity(0.2) : Color.accentColor)
             .foregroundStyle(newComment.isEmpty ? Color.secondary : Color.white)
