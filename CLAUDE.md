@@ -9,7 +9,7 @@ iTea is a native iOS/macOS client for self-hosted Gitea instances. It's built wi
 ## Architecture
 
 ```
-Gitea for iOS/
+iTea/
 ├── GiteaApp.swift              # App entry point
 ├── Core/
 │   ├── Authentication/         # Auth state & secure storage
@@ -72,15 +72,15 @@ All models conform to: `Codable, Identifiable, Hashable, Sendable`
 
 ```bash
 # Build for Mac Catalyst
-xcodebuild -project "Gitea for iOS.xcodeproj" \
-  -scheme "Gitea for iOS" \
+xcodebuild -project "iTea.xcodeproj" \
+  -scheme "iTea" \
   -destination "platform=macOS,variant=Mac Catalyst" \
   build
 
 # Build for iOS Simulator
-xcodebuild -project "Gitea for iOS.xcodeproj" \
-  -scheme "Gitea for iOS" \
-  -destination "platform=iOS Simulator,name=iPhone 16" \
+xcodebuild -project "iTea.xcodeproj" \
+  -scheme "iTea" \
+  -destination "platform=iOS Simulator,name=iPhone 17" \
   build
 ```
 
