@@ -42,7 +42,7 @@ struct IssueDetailView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            .padding(.bottom, 100) // Space for input
+            .padding(.bottom, 16)
         }
         .safeAreaInset(edge: .bottom) {
             commentInputBar
@@ -199,33 +199,21 @@ struct IssueDetailView: View {
                     CommentView(comment: comment)
                 }
 
-                // End of thread indicator
-                endOfThreadIndicator
             }
         }
-    }
-
-    private var endOfThreadIndicator: some View {
-        HStack(spacing: 12) {
-            VStack { Divider() }
-            Text("End of conversation")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-            VStack { Divider() }
-        }
-        .padding(.vertical, 16)
     }
 
     // MARK: - Comment Input
 
     private var commentInputBar: some View {
-        HStack(alignment: .bottom, spacing: 12) {
+        HStack(alignment: .bottom, spacing: 10) {
             TextField("Add a comment...", text: $newComment, axis: .vertical)
                 .textFieldStyle(.plain)
-                .lineLimit(2...6)
-                .padding(12)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .lineLimit(1...6)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(uiColor: .secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
                 .focused($isCommentFocused)
 
             Button {
@@ -234,20 +222,26 @@ struct IssueDetailView: View {
                 if isSubmitting {
                     ProgressView()
                         .controlSize(.small)
+                        .frame(width: 32, height: 32)
                 } else {
-                    Image(systemName: "paperplane.fill")
-                        .imageScale(.large)
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 32))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.accentColor)
                 }
             }
             .buttonStyle(.plain)
-            .frame(width: 44, height: 44)
-            .background(newComment.isEmpty ? Color.secondary.opacity(0.2) : Color.accentColor)
-            .foregroundStyle(newComment.isEmpty ? Color.secondary : Color.white)
-            .clipShape(Circle())
-            .disabled(newComment.isEmpty || isSubmitting)
+            .disabled(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
+            .animation(.easeInOut(duration: 0.15), value: newComment.isEmpty)
         }
-        .padding()
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background {
+            Rectangle()
+                .fill(.bar)
+                .ignoresSafeArea(edges: .bottom)
+                .shadow(color: .black.opacity(0.06), radius: 3, y: -2)
+        }
     }
 
     // MARK: - Actions

@@ -8,6 +8,7 @@ struct RepositoryDetailView: View {
     @State private var selectedSection = 0
     @State private var issueService: IssueService?
     @State private var pullRequestService: PullRequestService?
+    @State private var isHeaderExpanded = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,44 +68,82 @@ struct RepositoryDetailView: View {
         pullRequestService = PullRequestService(apiClient: apiClient)
     }
 
+    private var hasExpandableContent: Bool {
+        repository.description?.isEmpty == false
+    }
+
     private var repositoryHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(repository.fullName)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-
-                Spacer()
-
-                if repository.isPrivate {
-                    SwiftUI.Label("Private", systemImage: "lock.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            // Primary row - always visible, tappable to expand
+            Button {
+                if hasExpandableContent {
+                    withAnimation(.snappy(duration: 0.25)) {
+                        isHeaderExpanded.toggle()
+                    }
                 }
-            }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(repository.fullName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
 
-            if let description = repository.description, !description.isEmpty {
+                    if repository.isPrivate {
+                        Image(systemName: "lock.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    // Compact stats
+                    Spacer()
+
+                    HStack(spacing: 12) {
+                        if let stars = repository.starsCount, stars > 0 {
+                            HStack(spacing: 2) {
+                                Image(systemName: "star")
+                                Text("\(stars)")
+                            }
+                        }
+                        if let forks = repository.forksCount, forks > 0 {
+                            HStack(spacing: 2) {
+                                Image(systemName: "tuningfork")
+                                Text("\(forks)")
+                            }
+                        }
+                        if let issues = repository.openIssuesCount, issues > 0 {
+                            HStack(spacing: 2) {
+                                Image(systemName: "exclamationmark.circle")
+                                Text("\(issues)")
+                            }
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+
+                    if hasExpandableContent {
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(isHeaderExpanded ? 180 : 0))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Expandable description
+            if isHeaderExpanded, let description = repository.description, !description.isEmpty {
                 Text(description)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-
-            HStack(spacing: 20) {
-                if let stars = repository.starsCount {
-                    SwiftUI.Label("\(stars) stars", systemImage: "star")
-                }
-                if let forks = repository.forksCount {
-                    SwiftUI.Label("\(forks) forks", systemImage: "tuningfork")
-                }
-                if let issues = repository.openIssuesCount {
-                    SwiftUI.Label("\(issues) issues", systemImage: "exclamationmark.circle")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
         .background(.regularMaterial)
     }
 }
