@@ -133,8 +133,12 @@ struct MainTabView: View {
                 ProgressView()
             }
         case .notifications:
-            if let notificationService {
-                NotificationListView(notificationService: notificationService)
+            if let notificationService, let issueService, let pullRequestService {
+                NotificationListView(
+                    notificationService: notificationService,
+                    issueService: issueService,
+                    pullRequestService: pullRequestService
+                )
             } else {
                 ProgressView()
             }
@@ -164,7 +168,11 @@ struct MainTabView: View {
                     }
                     .tag(NavigationItem.repositories)
 
-                NotificationListView(notificationService: notificationService)
+                NotificationListView(
+                    notificationService: notificationService,
+                    issueService: issueService,
+                    pullRequestService: pullRequestService
+                )
                     .tabItem {
                         SwiftUI.Label("Notifications", systemImage: "bell")
                     }

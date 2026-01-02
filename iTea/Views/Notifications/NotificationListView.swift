@@ -1,7 +1,15 @@
 import SwiftUI
 
+/// Wrapper for navigation targets from notifications
+enum NotificationTarget: Hashable {
+    case issue(Issue, owner: String, repo: String)
+    case pullRequest(PullRequest, owner: String, repo: String)
+}
+
 struct NotificationListView: View {
     let notificationService: NotificationService
+    let issueService: IssueService
+    let pullRequestService: PullRequestService
 
     @State private var notifications: [GiteaNotification] = []
     @State private var isLoading = false
@@ -9,9 +17,11 @@ struct NotificationListView: View {
     @State private var showAll = false
     @State private var currentPage = 1
     @State private var hasMorePages = true
+    @State private var loadingNotificationId: Int?
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if isLoading && notifications.isEmpty {
                     ProgressView("Loading notifications...")
@@ -68,8 +78,13 @@ struct NotificationListView: View {
     private var notificationList: some View {
         List {
             ForEach(notifications) { notification in
-                NotificationRowView(notification: notification) {
+                NotificationRowView(
+                    notification: notification,
+                    isLoading: loadingNotificationId == notification.id
+                ) {
                     Task { await markAsRead(notification) }
+                } onTap: {
+                    Task { await navigateToNotification(notification) }
                 }
                 .onAppear {
                     Task { await loadMoreIfNeeded(currentItem: notification) }
@@ -86,6 +101,61 @@ struct NotificationListView: View {
             }
         }
         .listStyle(.plain)
+        .navigationDestination(for: NotificationTarget.self) { target in
+            switch target {
+            case let .issue(issue, owner, repo):
+                IssueDetailView(
+                    issue: issue,
+                    owner: owner,
+                    repo: repo,
+                    issueService: issueService
+                )
+            case let .pullRequest(pr, owner, repo):
+                PullRequestDetailView(
+                    pullRequest: pr,
+                    owner: owner,
+                    repo: repo,
+                    pullRequestService: pullRequestService
+                )
+            }
+        }
+    }
+
+    private func navigateToNotification(_ notification: GiteaNotification) async {
+        guard let number = notification.subject.issueOrPRNumber else { return }
+
+        let owner = notification.repository.ownerName
+        let repo = notification.repository.repoName
+
+        loadingNotificationId = notification.id
+        defer { loadingNotificationId = nil }
+
+        do {
+            switch notification.subject.type.lowercased() {
+            case "issue":
+                let issue = try await issueService.getIssue(owner: owner, repo: repo, index: number)
+                // Mark as read when navigating
+                try? await notificationService.markAsRead(notificationId: String(notification.id))
+                // Navigate programmatically by pushing to navigation stack
+                await MainActor.run {
+                    navigateTo(.issue(issue, owner: owner, repo: repo))
+                }
+            case "pull":
+                let pr = try await pullRequestService.getPullRequest(owner: owner, repo: repo, index: number)
+                try? await notificationService.markAsRead(notificationId: String(notification.id))
+                await MainActor.run {
+                    navigateTo(.pullRequest(pr, owner: owner, repo: repo))
+                }
+            default:
+                break
+            }
+        } catch {
+            // Silently fail - could show error in future
+        }
+    }
+
+    private func navigateTo(_ target: NotificationTarget) {
+        navigationPath.append(target)
     }
 
     private func loadNotifications() async {
@@ -150,47 +220,58 @@ struct NotificationListView: View {
 
 struct NotificationRowView: View {
     let notification: GiteaNotification
+    let isLoading: Bool
     let onMarkAsRead: () -> Void
+    let onTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                notificationIcon
+        Button {
+            onTap()
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 10) {
+                    notificationIcon
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(notification.subject.title)
-                        .font(.headline)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(notification.subject.title)
+                            .font(.headline)
+                            .lineLimit(2)
 
-                    HStack(spacing: 6) {
-                        Text(notification.repository.fullName)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            Text(notification.repository.fullName)
+                                .foregroundStyle(.secondary)
 
-                        Text("•")
-                            .foregroundStyle(.secondary)
+                            Text("•")
+                                .foregroundStyle(.secondary)
 
-                        Text(notification.subject.typeDisplay)
-                            .foregroundStyle(.secondary)
+                            Text(notification.subject.typeDisplay)
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.caption)
+
+                        if let date = notification.updatedAt {
+                            Text(date, style: .relative)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    .font(.caption)
 
-                    if let date = notification.updatedAt {
-                        Text(date, style: .relative)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                    Spacer()
+
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else if notification.unread {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 8, height: 8)
                     }
-                }
-
-                Spacer()
-
-                if notification.unread {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 8, height: 8)
                 }
             }
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 4)
+        .buttonStyle(.plain)
+        .disabled(isLoading)
         .swipeActions(edge: .trailing) {
             if notification.unread {
                 Button {
@@ -227,5 +308,9 @@ struct NotificationRowView: View {
 
 #Preview {
     let apiClient = APIClient(baseURL: URL(string: "https://example.com")!, tokenProvider: { nil })
-    NotificationListView(notificationService: NotificationService(apiClient: apiClient))
+    NotificationListView(
+        notificationService: NotificationService(apiClient: apiClient),
+        issueService: IssueService(apiClient: apiClient),
+        pullRequestService: PullRequestService(apiClient: apiClient)
+    )
 }

@@ -7,20 +7,57 @@ struct MarkdownText: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @Environment(DeepLinkHandler.self) private var deepLinkHandler: DeepLinkHandler?
 
-    /// Pre-process content to highlight @mentions as links
+    /// Pre-process content to highlight @mentions as links and handle HTML img tags
     private var processedContent: String {
+        var result = content
+
+        // Process HTML img tags intelligently:
+        // - Small inline icons (< 50px) are stripped (they're decorative and won't render well)
+        // - Larger images are converted to markdown
+        let imgPattern = #"<img\s+([^>]*)\/?>"#
+        if let imgRegex = try? NSRegularExpression(pattern: imgPattern, options: .caseInsensitive) {
+            let range = NSRange(result.startIndex..., in: result)
+            let matches = imgRegex.matches(in: result, range: range).reversed()
+
+            for match in matches {
+                guard let fullRange = Range(match.range, in: result),
+                      let attrsRange = Range(match.range(at: 1), in: result) else { continue }
+
+                let attrs = String(result[attrsRange])
+
+                // Extract src URL
+                guard let src = extractAttribute("src", from: attrs) else {
+                    result.replaceSubrange(fullRange, with: "")
+                    continue
+                }
+
+                // Extract dimensions (if specified)
+                let width = extractNumericAttribute("width", from: attrs)
+                let height = extractNumericAttribute("height", from: attrs)
+
+                // If both dimensions are explicitly small (< 50px), it's an inline icon - strip it
+                // Default to 100 if not specified (assume it's a real image)
+                let isSmallInlineIcon = (width ?? 100) < 50 && (height ?? 100) < 50
+
+                if isSmallInlineIcon {
+                    result.replaceSubrange(fullRange, with: "")
+                } else {
+                    result.replaceSubrange(fullRange, with: "![](\(src))")
+                }
+            }
+        }
+
         // Match @username patterns (alphanumeric, underscores, hyphens)
         // Avoid matching email addresses by requiring word boundary or start
         let pattern = #"(?<![a-zA-Z0-9.])@([a-zA-Z0-9][-a-zA-Z0-9_]*)"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return content
+            return result
         }
 
-        let range = NSRange(content.startIndex..., in: content)
-        var result = content
+        let range = NSRange(result.startIndex..., in: result)
 
         // Process matches in reverse to preserve indices
-        let matches = regex.matches(in: content, range: range).reversed()
+        let matches = regex.matches(in: result, range: range).reversed()
         for match in matches {
             guard let fullRange = Range(match.range, in: result),
                   let usernameRange = Range(match.range(at: 1), in: result) else { continue }
@@ -31,6 +68,28 @@ struct MarkdownText: View {
         }
 
         return result
+    }
+
+    /// Extract a string attribute value from HTML attributes
+    private func extractAttribute(_ name: String, from attrs: String) -> String? {
+        let pattern = "\(name)\\s*=\\s*[\"']([^\"']+)[\"']"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let match = regex.firstMatch(in: attrs, range: NSRange(attrs.startIndex..., in: attrs)),
+              let valueRange = Range(match.range(at: 1), in: attrs) else {
+            return nil
+        }
+        return String(attrs[valueRange])
+    }
+
+    /// Extract a numeric attribute value from HTML attributes (handles "14px", "14", etc.)
+    private func extractNumericAttribute(_ name: String, from attrs: String) -> Int? {
+        let pattern = "\(name)\\s*=\\s*[\"']?(\\d+)"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let match = regex.firstMatch(in: attrs, range: NSRange(attrs.startIndex..., in: attrs)),
+              let valueRange = Range(match.range(at: 1), in: attrs) else {
+            return nil
+        }
+        return Int(attrs[valueRange])
     }
 
     var body: some View {
