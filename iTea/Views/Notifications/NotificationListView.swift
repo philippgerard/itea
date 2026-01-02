@@ -134,16 +134,17 @@ struct NotificationListView: View {
             switch notification.subject.type.lowercased() {
             case "issue":
                 let issue = try await issueService.getIssue(owner: owner, repo: repo, index: number)
-                // Mark as read when navigating
+                // Mark as read and remove from list
                 try? await notificationService.markAsRead(notificationId: String(notification.id))
-                // Navigate programmatically by pushing to navigation stack
                 await MainActor.run {
+                    removeNotification(notification)
                     navigateTo(.issue(issue, owner: owner, repo: repo))
                 }
             case "pull":
                 let pr = try await pullRequestService.getPullRequest(owner: owner, repo: repo, index: number)
                 try? await notificationService.markAsRead(notificationId: String(notification.id))
                 await MainActor.run {
+                    removeNotification(notification)
                     navigateTo(.pullRequest(pr, owner: owner, repo: repo))
                 }
             default:
@@ -156,6 +157,13 @@ struct NotificationListView: View {
 
     private func navigateTo(_ target: NotificationTarget) {
         navigationPath.append(target)
+    }
+
+    private func removeNotification(_ notification: GiteaNotification) {
+        // Only remove if not showing all (when showing all, keep it but mark as read)
+        if !showAll {
+            notifications.removeAll { $0.id == notification.id }
+        }
     }
 
     private func loadNotifications() async {
