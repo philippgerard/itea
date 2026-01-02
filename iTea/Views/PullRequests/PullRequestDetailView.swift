@@ -55,6 +55,9 @@ struct PullRequestDetailView: View {
             .padding(.top, 8)
             .padding(.bottom, 16)
         }
+        .refreshable {
+            await refresh()
+        }
         .safeAreaInset(edge: .bottom) {
             commentInputBar
         }
@@ -519,6 +522,39 @@ struct PullRequestDetailView: View {
     }
 
     // MARK: - Actions
+
+    private func refresh() async {
+        async let prTask: () = refreshPullRequest()
+        async let commentsTask: () = refreshComments()
+        async let statusTask: () = loadCommitStatus()
+        _ = await (prTask, commentsTask, statusTask)
+    }
+
+    private func refreshComments() async {
+        do {
+            comments = try await pullRequestService.getComments(
+                owner: owner,
+                repo: repo,
+                prIndex: currentPR.number
+            )
+        } catch {
+            // Silently fail on refresh - user can pull again
+        }
+    }
+
+    private func refreshPullRequest() async {
+        do {
+            let updatedPR = try await pullRequestService.getPullRequest(
+                owner: owner,
+                repo: repo,
+                index: currentPR.number
+            )
+            currentPR = updatedPR
+            onPullRequestUpdated?(updatedPR)
+        } catch {
+            // Silently fail on refresh - data is still shown from before
+        }
+    }
 
     private func loadComments() async {
         isLoading = true

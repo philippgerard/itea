@@ -44,6 +44,9 @@ struct IssueDetailView: View {
             .padding(.top, 8)
             .padding(.bottom, 16)
         }
+        .refreshable {
+            await refresh()
+        }
         .safeAreaInset(edge: .bottom) {
             commentInputBar
         }
@@ -245,6 +248,38 @@ struct IssueDetailView: View {
     }
 
     // MARK: - Actions
+
+    private func refresh() async {
+        async let issueTask: () = refreshIssue()
+        async let commentsTask: () = refreshComments()
+        _ = await (issueTask, commentsTask)
+    }
+
+    private func refreshComments() async {
+        do {
+            comments = try await issueService.getComments(
+                owner: owner,
+                repo: repo,
+                issueIndex: currentIssue.number
+            )
+        } catch {
+            // Silently fail on refresh - user can pull again
+        }
+    }
+
+    private func refreshIssue() async {
+        do {
+            let updatedIssue = try await issueService.getIssue(
+                owner: owner,
+                repo: repo,
+                index: currentIssue.number
+            )
+            currentIssue = updatedIssue
+            onIssueUpdated?(updatedIssue)
+        } catch {
+            // Silently fail on refresh - data is still shown from before
+        }
+    }
 
     private func loadComments() async {
         isLoading = true
