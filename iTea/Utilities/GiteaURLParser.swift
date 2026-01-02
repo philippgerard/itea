@@ -32,24 +32,26 @@ struct GiteaURLParser {
         let path = url.path
 
         // Path format: /owner/repo/compare/base...head
-        let components = path.split(separator: "/").map(String.init)
-
-        guard components.count >= 4,
-              components[2] == "compare" else {
+        // Note: branch names can contain "/" so we can't just split by "/"
+        // We need to find "/compare/" and extract everything after it
+        guard let compareRange = path.range(of: "/compare/") else {
             return nil
         }
 
-        let owner = components[0]
-        let repo = components[1]
-        let branchComparison = components[3]
-
-        // Split base...head
-        let branches = branchComparison.split(separator: ".", maxSplits: 2, omittingEmptySubsequences: false)
-        guard branches.count >= 2 else {
+        // Get owner/repo from the part before /compare/
+        let ownerRepoPath = String(path[..<compareRange.lowerBound])
+        let ownerRepoComponents = ownerRepoPath.split(separator: "/").map(String.init)
+        guard ownerRepoComponents.count >= 2 else {
             return nil
         }
 
-        // Handle "base...head" format (3 dots)
+        let owner = ownerRepoComponents[0]
+        let repo = ownerRepoComponents[1]
+
+        // Get everything after /compare/ (this is base...head, where head may contain "/")
+        let branchComparison = String(path[compareRange.upperBound...])
+
+        // Handle "base...head" format (3 dots) or "base..head" (2 dots)
         let baseBranch: String
         let headBranch: String
 

@@ -4,11 +4,13 @@ struct SettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @State private var showLogoutConfirmation = false
     @State private var showLicenses = false
+    @AppStorage("quickMentionText") private var quickMentionText = "@claude"
 
     var body: some View {
         NavigationStack {
             List {
                 accountSection
+                quickActionsSection
                 aboutSection
                 legalSection
             }
@@ -63,6 +65,23 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+        }
+    }
+
+    private var quickActionsSection: some View {
+        Section {
+            HStack {
+                Text("Quick Mention")
+                Spacer()
+                TextField("@claude", text: $quickMentionText)
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 150)
+            }
+        } header: {
+            Text("Quick Actions")
+        } footer: {
+            Text("This text will be inserted when you tap the mention button in the new issue form.")
         }
     }
 

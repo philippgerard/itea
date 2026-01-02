@@ -101,19 +101,15 @@ struct PullRequestDetailView: View {
                 }
             }
         }
-        .confirmationDialog("Merge Pull Request", isPresented: $showMergeOptions, titleVisibility: .visible) {
-            Button("Merge commit") {
-                Task { await mergePR(method: .merge) }
+        .sheet(isPresented: $showMergeOptions) {
+            MergeOptionsSheet(
+                prTitle: currentPR.title,
+                isMerging: $isMerging
+            ) { method in
+                Task { await mergePR(method: method) }
             }
-            Button("Squash and merge") {
-                Task { await mergePR(method: .squash) }
-            }
-            Button("Rebase and merge") {
-                Task { await mergePR(method: .rebase) }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Choose how to merge this pull request")
+            .presentationDetents([.height(280)])
+            .presentationDragIndicator(.visible)
         }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
@@ -677,5 +673,95 @@ struct PullRequestDetailView: View {
         }
 
         isMerging = false
+    }
+}
+
+// MARK: - Merge Options Sheet
+
+struct MergeOptionsSheet: View {
+    let prTitle: String
+    @Binding var isMerging: Bool
+    let onMerge: (MergeMethod) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Options list
+                VStack(spacing: 2) {
+                    mergeOptionButton(
+                        method: .merge,
+                        title: "Create a merge commit",
+                        description: "All commits will be added with a merge commit",
+                        icon: "arrow.triangle.merge"
+                    )
+
+                    mergeOptionButton(
+                        method: .squash,
+                        title: "Squash and merge",
+                        description: "Combine all commits into one commit",
+                        icon: "square.stack.3d.up"
+                    )
+
+                    mergeOptionButton(
+                        method: .rebase,
+                        title: "Rebase and merge",
+                        description: "Add all commits to the base branch",
+                        icon: "arrow.triangle.branch"
+                    )
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                Spacer()
+            }
+            .navigationTitle("Merge Pull Request")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func mergeOptionButton(method: MergeMethod, title: String, description: String, icon: String) -> some View {
+        Button {
+            onMerge(method)
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body)
+                        .fontWeight(.medium)
+
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isMerging {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .disabled(isMerging)
     }
 }

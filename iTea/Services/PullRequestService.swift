@@ -35,7 +35,7 @@ final class PullRequestService: Sendable {
 
     /// Merges a pull request
     func mergePullRequest(owner: String, repo: String, index: Int, method: MergeMethod = .merge, message: String? = nil) async throws {
-        let _: EmptyResponse = try await apiClient.request(.mergePullRequest(owner: owner, repo: repo, index: index, method: method, message: message))
+        try await apiClient.requestWithoutResponse(.mergePullRequest(owner: owner, repo: repo, index: index, method: method, message: message))
     }
 
     /// Gets the combined CI status for the head commit of a pull request

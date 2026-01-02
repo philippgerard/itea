@@ -213,7 +213,10 @@ struct APIEndpoint: Sendable {
     static func markNotificationRead(id: String) -> APIEndpoint {
         APIEndpoint(
             path: "/notifications/threads/\(id)",
-            method: .patch
+            method: .patch,
+            queryItems: [
+                URLQueryItem(name: "to-status", value: "read")
+            ]
         )
     }
 

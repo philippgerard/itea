@@ -5,6 +5,7 @@ enum APIError: Error, LocalizedError {
     case unauthorized
     case forbidden
     case notFound
+    case conflict
     case validationError(String)
     case serverError(Int)
     case decodingError(Error)
@@ -21,6 +22,8 @@ enum APIError: Error, LocalizedError {
             return "Access denied. You don't have permission to access this resource."
         case .notFound:
             return "Resource not found"
+        case .conflict:
+            return "A pull request already exists for this branch"
         case .validationError(let message):
             return "Validation error: \(message)"
         case .serverError(let code):

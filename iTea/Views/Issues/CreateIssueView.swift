@@ -7,6 +7,7 @@ struct CreateIssueView: View {
     let onCreated: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("quickMentionText") private var quickMentionText = "@claude"
 
     @State private var title = ""
     @State private var descriptionText = ""
@@ -53,9 +54,22 @@ struct CreateIssueView: View {
 
                     // Description section
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Description")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
+                        HStack {
+                            Text("Description")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Button {
+                                insertMention()
+                            } label: {
+                                Text(quickMentionText)
+                                    .font(.subheadline)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
                         TextEditor(text: $descriptionText)
                             .frame(minHeight: 200)
                             .overlay(
@@ -105,9 +119,22 @@ struct CreateIssueView: View {
                     TextField("Issue title", text: $title)
                 }
 
-                Section("Description") {
+                Section {
                     TextEditor(text: $descriptionText)
                         .frame(minHeight: 150)
+                } header: {
+                    HStack {
+                        Text("Description")
+
+                        Spacer()
+
+                        Button {
+                            insertMention()
+                        } label: {
+                            Text(quickMentionText)
+                                .font(.caption)
+                        }
+                    }
                 }
             }
             .navigationTitle("New Issue")
@@ -133,6 +160,16 @@ struct CreateIssueView: View {
             } message: {
                 Text(errorMessage ?? "Unknown error")
             }
+        }
+    }
+
+    private func insertMention() {
+        if descriptionText.isEmpty {
+            descriptionText = quickMentionText + " "
+        } else if descriptionText.hasSuffix("\n") || descriptionText.hasSuffix(" ") {
+            descriptionText += quickMentionText + " "
+        } else {
+            descriptionText += " " + quickMentionText + " "
         }
     }
 

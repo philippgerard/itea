@@ -19,6 +19,7 @@ struct NotificationListView: View {
     @State private var hasMorePages = true
     @State private var loadingNotificationId: Int?
     @State private var navigationPath = NavigationPath()
+    @State private var hasInitiallyLoaded = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -70,7 +71,27 @@ struct NotificationListView: View {
                 Task { await loadNotifications() }
             }
             .task {
+                guard !hasInitiallyLoaded else { return }
+                hasInitiallyLoaded = true
                 await loadNotifications()
+            }
+            .navigationDestination(for: NotificationTarget.self) { target in
+                switch target {
+                case let .issue(issue, owner, repo):
+                    IssueDetailView(
+                        issue: issue,
+                        owner: owner,
+                        repo: repo,
+                        issueService: issueService
+                    )
+                case let .pullRequest(pr, owner, repo):
+                    PullRequestDetailView(
+                        pullRequest: pr,
+                        owner: owner,
+                        repo: repo,
+                        pullRequestService: pullRequestService
+                    )
+                }
             }
         }
     }
@@ -101,24 +122,6 @@ struct NotificationListView: View {
             }
         }
         .listStyle(.plain)
-        .navigationDestination(for: NotificationTarget.self) { target in
-            switch target {
-            case let .issue(issue, owner, repo):
-                IssueDetailView(
-                    issue: issue,
-                    owner: owner,
-                    repo: repo,
-                    issueService: issueService
-                )
-            case let .pullRequest(pr, owner, repo):
-                PullRequestDetailView(
-                    pullRequest: pr,
-                    owner: owner,
-                    repo: repo,
-                    pullRequestService: pullRequestService
-                )
-            }
-        }
     }
 
     private func navigateToNotification(_ notification: GiteaNotification) async {
@@ -134,17 +137,21 @@ struct NotificationListView: View {
             switch notification.subject.type.lowercased() {
             case "issue":
                 let issue = try await issueService.getIssue(owner: owner, repo: repo, index: number)
-                // Mark as read and remove from list
-                try? await notificationService.markAsRead(notificationId: String(notification.id))
+                // Mark as read - only remove from list if successful
+                let markReadSucceeded = await markAsReadSilently(notification)
                 await MainActor.run {
-                    removeNotification(notification)
+                    if markReadSucceeded {
+                        removeNotification(notification)
+                    }
                     navigateTo(.issue(issue, owner: owner, repo: repo))
                 }
             case "pull":
                 let pr = try await pullRequestService.getPullRequest(owner: owner, repo: repo, index: number)
-                try? await notificationService.markAsRead(notificationId: String(notification.id))
+                let markReadSucceeded = await markAsReadSilently(notification)
                 await MainActor.run {
-                    removeNotification(notification)
+                    if markReadSucceeded {
+                        removeNotification(notification)
+                    }
                     navigateTo(.pullRequest(pr, owner: owner, repo: repo))
                 }
             default:
@@ -152,6 +159,15 @@ struct NotificationListView: View {
             }
         } catch {
             // Silently fail - could show error in future
+        }
+    }
+
+    private func markAsReadSilently(_ notification: GiteaNotification) async -> Bool {
+        do {
+            try await notificationService.markAsRead(notificationId: String(notification.id))
+            return true
+        } catch {
+            return false
         }
     }
 

@@ -70,6 +70,8 @@ All models conform to: `Codable, Identifiable, Hashable, Sendable`
 
 ## Build Commands
 
+**Important:** Always use the latest iOS simulator available (currently iOS 26.2 on iPhone 17 Pro).
+
 ```bash
 # Build for Mac Catalyst
 xcodebuild -project "iTea.xcodeproj" \
@@ -80,7 +82,7 @@ xcodebuild -project "iTea.xcodeproj" \
 # Build for iOS Simulator
 xcodebuild -project "iTea.xcodeproj" \
   -scheme "iTea" \
-  -destination "platform=iOS Simulator,name=iPhone 17" \
+  -destination "platform=iOS Simulator,name=iPhone 17 Pro" \
   build
 ```
 
@@ -116,6 +118,15 @@ xcodebuild -project "iTea.xcodeproj" \
 - Row views: `*RowView.swift` (e.g., `IssueRowView.swift`)
 - Services: `*Service.swift`
 - Models: Singular noun (e.g., `Issue.swift`, `PullRequest.swift`)
+
+## Gitea API Reference
+
+Always use the latest Gitea API documentation: https://docs.gitea.com/api/1.24/
+
+Key endpoints used:
+- Notifications: `GET/PUT /notifications`, `PATCH /notifications/threads/{id}`
+- Issues: `GET/POST /repos/{owner}/{repo}/issues`
+- Pull Requests: `GET/POST /repos/{owner}/{repo}/pulls`
 
 ## Testing the App
 

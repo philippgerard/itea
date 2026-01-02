@@ -96,6 +96,8 @@ final class APIClient: Sendable {
             throw APIError.forbidden
         case 404:
             throw APIError.notFound
+        case 409:
+            throw APIError.conflict
         case 422:
             throw APIError.validationError("Validation failed")
         case 500...599:
