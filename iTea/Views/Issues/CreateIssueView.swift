@@ -1,10 +1,12 @@
 import SwiftUI
+import PhotosUI
 import FoundationModels
 
 struct CreateIssueView: View {
     let owner: String
     let repo: String
     let issueService: IssueService
+    let attachmentService: AttachmentService
     let onCreated: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +18,11 @@ struct CreateIssueView: View {
     @State private var isGeneratingTitle = false
     @State private var errorMessage: String?
     @State private var showError = false
+
+    // Attachment state
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var pendingAttachments: [PendingAttachment] = []
+    @State private var isLoadingPhotos = false
 
     private var canGenerateTitle: Bool {
         SystemLanguageModel.default.isAvailable && descriptionText.count > 20 && !isGeneratingTitle
@@ -100,6 +107,59 @@ struct CreateIssueView: View {
                                     .stroke(Color(uiColor: .separator), lineWidth: 1)
                             )
                     }
+
+                    // Attachments section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Attachments")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+
+                        if pendingAttachments.isEmpty {
+                            PhotosPicker(
+                                selection: $selectedPhotos,
+                                maxSelectionCount: 10,
+                                matching: .any(of: [.images, .screenshots])
+                            ) {
+                                SwiftUI.Label("Add Images", systemImage: "photo.on.rectangle.angled")
+                            }
+                            .buttonStyle(.bordered)
+                        } else {
+                            HStack(alignment: .top, spacing: 8) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], alignment: .leading, spacing: 8) {
+                                    ForEach(pendingAttachments) { attachment in
+                                        PendingAttachmentThumbnailView(attachment: attachment) {
+                                            pendingAttachments.removeAll { $0.id == attachment.id }
+                                        }
+                                    }
+                                }
+
+                                Spacer()
+
+                                PhotosPicker(
+                                    selection: $selectedPhotos,
+                                    maxSelectionCount: 10,
+                                    matching: .any(of: [.images, .screenshots])
+                                ) {
+                                    Image(systemName: "plus")
+                                        .font(.title3)
+                                        .frame(width: 72, height: 72)
+                                        .background(Color(uiColor: .tertiarySystemFill))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        if isLoadingPhotos {
+                            HStack {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Loading photos...")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
                 .padding(24)
             }
@@ -130,6 +190,11 @@ struct CreateIssueView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "Unknown error")
+        }
+        .onChange(of: selectedPhotos) { _, newValue in
+            if !newValue.isEmpty {
+                Task { await loadSelectedPhotos() }
+            }
         }
     }
 
@@ -176,6 +241,53 @@ struct CreateIssueView: View {
                         }
                     }
                 }
+
+                Section("Attachments") {
+                    if pendingAttachments.isEmpty && !isLoadingPhotos {
+                        PhotosPicker(
+                            selection: $selectedPhotos,
+                            maxSelectionCount: 10,
+                            matching: .any(of: [.images, .screenshots])
+                        ) {
+                            SwiftUI.Label("Add Images", systemImage: "photo.on.rectangle.angled")
+                        }
+                    } else {
+                        if isLoadingPhotos {
+                            HStack {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Loading photos...")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if !pendingAttachments.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(pendingAttachments) { attachment in
+                                        PendingAttachmentThumbnailView(attachment: attachment) {
+                                            pendingAttachments.removeAll { $0.id == attachment.id }
+                                        }
+                                    }
+
+                                    PhotosPicker(
+                                        selection: $selectedPhotos,
+                                        maxSelectionCount: 10,
+                                        matching: .any(of: [.images, .screenshots])
+                                    ) {
+                                        Image(systemName: "plus")
+                                            .font(.title3)
+                                            .frame(width: 72, height: 72)
+                                            .background(Color(uiColor: .tertiarySystemFill))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle("New Issue")
             .navigationBarTitleDisplayMode(.inline)
@@ -199,6 +311,11 @@ struct CreateIssueView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage ?? "Unknown error")
+            }
+            .onChange(of: selectedPhotos) { _, newValue in
+                if !newValue.isEmpty {
+                    Task { await loadSelectedPhotos() }
+                }
             }
         }
     }
@@ -242,12 +359,26 @@ struct CreateIssueView: View {
         }
 
         do {
-            _ = try await issueService.createIssue(
+            // Create the issue first
+            let createdIssue = try await issueService.createIssue(
                 owner: owner,
                 repo: repo,
                 title: title,
                 body: descriptionText
             )
+
+            // Upload attachments if any
+            for attachment in pendingAttachments {
+                _ = try await attachmentService.uploadIssueAttachment(
+                    owner: owner,
+                    repo: repo,
+                    index: createdIssue.number,
+                    data: attachment.data,
+                    fileName: attachment.fileName,
+                    mimeType: attachment.mimeType
+                )
+            }
+
             onCreated()
             dismiss()
         } catch {
@@ -256,5 +387,78 @@ struct CreateIssueView: View {
         }
 
         isSubmitting = false
+    }
+
+    private func loadSelectedPhotos() async {
+        guard !selectedPhotos.isEmpty else { return }
+
+        isLoadingPhotos = true
+        defer {
+            isLoadingPhotos = false
+            selectedPhotos = []
+        }
+
+        for item in selectedPhotos {
+            do {
+                if let data = try await item.loadTransferable(type: Data.self) {
+                    // Determine file name and type
+                    let fileName: String
+                    let mimeType: String
+
+                    if let contentType = item.supportedContentTypes.first {
+                        let ext = contentType.preferredFilenameExtension ?? "jpg"
+                        fileName = "image_\(UUID().uuidString.prefix(8)).\(ext)"
+                        mimeType = contentType.preferredMIMEType ?? "image/jpeg"
+                    } else {
+                        fileName = "image_\(UUID().uuidString.prefix(8)).jpg"
+                        mimeType = "image/jpeg"
+                    }
+
+                    // Create thumbnail
+                    let thumbnailData: Data?
+                    if let uiImage = UIImage(data: data) {
+                        let maxSize: CGFloat = 200
+                        let scale = min(maxSize / uiImage.size.width, maxSize / uiImage.size.height, 1.0)
+                        let newSize = CGSize(
+                            width: uiImage.size.width * scale,
+                            height: uiImage.size.height * scale
+                        )
+                        let renderer = UIGraphicsImageRenderer(size: newSize)
+                        let thumbnail = renderer.image { _ in
+                            uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                        }
+                        thumbnailData = thumbnail.jpegData(compressionQuality: 0.7)
+                    } else {
+                        thumbnailData = nil
+                    }
+
+                    let pending = PendingAttachment(
+                        data: data,
+                        fileName: fileName,
+                        mimeType: mimeType,
+                        thumbnail: thumbnailData
+                    )
+                    pendingAttachments.append(pending)
+                }
+            } catch {
+                // Skip failed items
+                continue
+            }
+        }
+    }
+}
+
+// MARK: - Photo Loading Modifier
+
+extension CreateIssueView {
+    @ViewBuilder
+    func withPhotoLoading() -> some View {
+        self.onChange(of: selectedPhotos) { _, newValue in
+            if !newValue.isEmpty {
+                Task {
+                    await loadSelectedPhotos()
+                }
+            }
+        }
     }
 }

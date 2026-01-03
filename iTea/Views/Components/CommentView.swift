@@ -3,14 +3,18 @@ import SwiftUI
 struct CommentView: View {
     let comment: Comment
     let currentUserId: Int?
+    let token: String?
     var onEdit: ((Comment) -> Void)?
     var onDelete: ((Comment) -> Void)?
+    var onAttachmentTap: ((Attachment) -> Void)?
 
-    init(comment: Comment, currentUserId: Int? = nil, onEdit: ((Comment) -> Void)? = nil, onDelete: ((Comment) -> Void)? = nil) {
+    init(comment: Comment, currentUserId: Int? = nil, token: String? = nil, onEdit: ((Comment) -> Void)? = nil, onDelete: ((Comment) -> Void)? = nil, onAttachmentTap: ((Attachment) -> Void)? = nil) {
         self.comment = comment
         self.currentUserId = currentUserId
+        self.token = token
         self.onEdit = onEdit
         self.onDelete = onDelete
+        self.onAttachmentTap = onAttachmentTap
     }
 
     private var canModify: Bool {
@@ -72,6 +76,16 @@ struct CommentView: View {
 
             // Content
             MarkdownText(content: comment.body)
+
+            // Attachments
+            if comment.hasAttachments, let attachments = comment.attachments {
+                Divider()
+                    .padding(.vertical, 4)
+
+                AttachmentGridView(attachments: attachments, token: token) { attachment in
+                    onAttachmentTap?(attachment)
+                }
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,7 +126,8 @@ struct CommentView: View {
                         created: nil
                     ),
                     createdAt: Date(),
-                    updatedAt: nil
+                    updatedAt: nil,
+                    attachments: nil
                 )
             )
 
@@ -139,7 +154,8 @@ struct CommentView: View {
                         created: nil
                     ),
                     createdAt: Date().addingTimeInterval(-3600),
-                    updatedAt: Date()
+                    updatedAt: Date(),
+                    attachments: nil
                 )
             )
         }

@@ -10,6 +10,7 @@ struct NotificationListView: View {
     let notificationService: NotificationService
     let issueService: IssueService
     let pullRequestService: PullRequestService
+    let attachmentService: AttachmentService
 
     @State private var notifications: [GiteaNotification] = []
     @State private var isLoading = false
@@ -82,7 +83,8 @@ struct NotificationListView: View {
                         issue: issue,
                         owner: owner,
                         repo: repo,
-                        issueService: issueService
+                        issueService: issueService,
+                        attachmentService: attachmentService
                     )
                 case let .pullRequest(pr, owner, repo):
                     PullRequestDetailView(
@@ -335,6 +337,7 @@ struct NotificationRowView: View {
     NotificationListView(
         notificationService: NotificationService(apiClient: apiClient),
         issueService: IssueService(apiClient: apiClient),
-        pullRequestService: PullRequestService(apiClient: apiClient)
+        pullRequestService: PullRequestService(apiClient: apiClient),
+        attachmentService: AttachmentService(apiClient: apiClient)
     )
 }

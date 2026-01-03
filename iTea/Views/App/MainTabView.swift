@@ -40,6 +40,7 @@ struct MainTabView: View {
     @State private var notificationService: NotificationService?
     @State private var issueService: IssueService?
     @State private var pullRequestService: PullRequestService?
+    @State private var attachmentService: AttachmentService?
 
     private func setupServices() {
         guard repositoryService == nil else { return }
@@ -54,6 +55,7 @@ struct MainTabView: View {
         notificationService = NotificationService(apiClient: apiClient)
         issueService = IssueService(apiClient: apiClient)
         pullRequestService = PullRequestService(apiClient: apiClient)
+        attachmentService = AttachmentService(apiClient: apiClient)
     }
 
     var body: some View {
@@ -142,21 +144,23 @@ struct MainTabView: View {
                 ProgressView()
             }
         case .notifications:
-            if let notificationService, let issueService, let pullRequestService {
+            if let notificationService, let issueService, let pullRequestService, let attachmentService {
                 NotificationListView(
                     notificationService: notificationService,
                     issueService: issueService,
-                    pullRequestService: pullRequestService
+                    pullRequestService: pullRequestService,
+                    attachmentService: attachmentService
                 )
             } else {
                 ProgressView()
             }
         case .search:
-            if let repositoryService, let issueService, let pullRequestService {
+            if let repositoryService, let issueService, let pullRequestService, let attachmentService {
                 SearchView(
                     repositoryService: repositoryService,
                     issueService: issueService,
-                    pullRequestService: pullRequestService
+                    pullRequestService: pullRequestService,
+                    attachmentService: attachmentService
                 )
             } else {
                 ProgressView()
@@ -170,7 +174,7 @@ struct MainTabView: View {
 
     private var tabNavigation: some View {
         TabView(selection: $selectedTab) {
-            if let repositoryService, let notificationService, let issueService, let pullRequestService {
+            if let repositoryService, let notificationService, let issueService, let pullRequestService, let attachmentService {
                 RepositoryListView(repositoryService: repositoryService)
                     .tabItem {
                         SwiftUI.Label("Repositories", systemImage: "folder")
@@ -180,7 +184,8 @@ struct MainTabView: View {
                 NotificationListView(
                     notificationService: notificationService,
                     issueService: issueService,
-                    pullRequestService: pullRequestService
+                    pullRequestService: pullRequestService,
+                    attachmentService: attachmentService
                 )
                     .tabItem {
                         SwiftUI.Label("Notifications", systemImage: "bell")
@@ -190,7 +195,8 @@ struct MainTabView: View {
                 SearchView(
                     repositoryService: repositoryService,
                     issueService: issueService,
-                    pullRequestService: pullRequestService
+                    pullRequestService: pullRequestService,
+                    attachmentService: attachmentService
                 )
                 .tabItem {
                     SwiftUI.Label("Search", systemImage: "magnifyingglass")

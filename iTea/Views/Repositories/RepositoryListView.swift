@@ -14,6 +14,7 @@ struct RepositoryListView: View {
     @State private var navigationPath = NavigationPath()
     @State private var issueService: IssueService?
     @State private var pullRequestService: PullRequestService?
+    @State private var attachmentService: AttachmentService?
 
     var filteredRepositories: [Repository] {
         if searchText.isEmpty {
@@ -75,6 +76,7 @@ struct RepositoryListView: View {
         let apiClient = APIClient(baseURL: serverURL, tokenProvider: { token })
         issueService = IssueService(apiClient: apiClient)
         pullRequestService = PullRequestService(apiClient: apiClient)
+        attachmentService = AttachmentService(apiClient: apiClient)
     }
 
     private func handleDeepLinkAction(_ action: DeepLinkAction?) {
@@ -160,12 +162,13 @@ struct RepositoryListView: View {
             RepositoryDetailView(repository: repository, repositoryService: repositoryService)
         }
         .navigationDestination(for: IssueNavigationItem.self) { item in
-            if let issueService {
+            if let issueService, let attachmentService {
                 IssueDetailView(
                     issue: item.issue,
                     owner: item.owner,
                     repo: item.repo,
-                    issueService: issueService
+                    issueService: issueService,
+                    attachmentService: attachmentService
                 )
             }
         }

@@ -18,6 +18,7 @@ struct SearchView: View {
     let repositoryService: RepositoryService
     let issueService: IssueService?
     let pullRequestService: PullRequestService?
+    let attachmentService: AttachmentService?
 
     @State private var searchText = ""
     @State private var selectedScope: SearchScope = .repositories
@@ -103,12 +104,13 @@ struct SearchView: View {
                 RepositoryDetailView(repository: repository, repositoryService: repositoryService)
             }
             .navigationDestination(for: SearchIssueNavItem.self) { item in
-                if let issueService {
+                if let issueService, let attachmentService {
                     IssueDetailView(
                         issue: item.issue,
                         owner: item.owner,
                         repo: item.repo,
-                        issueService: issueService
+                        issueService: issueService,
+                        attachmentService: attachmentService
                     )
                 }
             }
@@ -168,12 +170,13 @@ struct SearchView: View {
                 RepositoryDetailView(repository: repository, repositoryService: repositoryService)
             }
             .navigationDestination(for: SearchIssueNavItem.self) { item in
-                if let issueService {
+                if let issueService, let attachmentService {
                     IssueDetailView(
                         issue: item.issue,
                         owner: item.owner,
                         repo: item.repo,
-                        issueService: issueService
+                        issueService: issueService,
+                        attachmentService: attachmentService
                     )
                 }
             }
@@ -453,6 +456,7 @@ struct SearchPRRowView: View {
     SearchView(
         repositoryService: RepositoryService(apiClient: apiClient),
         issueService: nil,
-        pullRequestService: nil
+        pullRequestService: nil,
+        attachmentService: nil
     )
 }

@@ -251,6 +251,50 @@ struct APIEndpoint: Sendable {
         )
     }
 
+    // MARK: - Attachment Endpoints
+
+    /// Get attachments for an issue
+    static func issueAttachments(owner: String, repo: String, index: Int) -> APIEndpoint {
+        APIEndpoint(path: "/repos/\(owner)/\(repo)/issues/\(index)/assets")
+    }
+
+    /// Upload attachment to an issue (multipart/form-data)
+    static func uploadIssueAttachment(owner: String, repo: String, index: Int) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/issues/\(index)/assets",
+            method: .post
+        )
+    }
+
+    /// Delete an attachment from an issue
+    static func deleteIssueAttachment(owner: String, repo: String, index: Int, attachmentId: Int) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/issues/\(index)/assets/\(attachmentId)",
+            method: .delete
+        )
+    }
+
+    /// Get attachments for a comment
+    static func commentAttachments(owner: String, repo: String, commentId: Int) -> APIEndpoint {
+        APIEndpoint(path: "/repos/\(owner)/\(repo)/issues/comments/\(commentId)/assets")
+    }
+
+    /// Upload attachment to a comment (multipart/form-data)
+    static func uploadCommentAttachment(owner: String, repo: String, commentId: Int) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/issues/comments/\(commentId)/assets",
+            method: .post
+        )
+    }
+
+    /// Delete an attachment from a comment
+    static func deleteCommentAttachment(owner: String, repo: String, commentId: Int, attachmentId: Int) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/issues/comments/\(commentId)/assets/\(attachmentId)",
+            method: .delete
+        )
+    }
+
     // MARK: - Notification Endpoints
 
     static func notifications(all: Bool = false, page: Int = 1, limit: Int = 20) -> APIEndpoint {

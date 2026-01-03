@@ -8,6 +8,7 @@ struct RepositoryDetailView: View {
     @State private var selectedSection = 0
     @State private var issueService: IssueService?
     @State private var pullRequestService: PullRequestService?
+    @State private var attachmentService: AttachmentService?
     @State private var isHeaderExpanded = false
 
     var body: some View {
@@ -22,20 +23,22 @@ struct RepositoryDetailView: View {
             .padding()
             .background(.ultraThinMaterial)
 
-            if let issueService, let pullRequestService {
+            if let issueService, let pullRequestService, let attachmentService {
                 switch selectedSection {
                 case 0:
                     IssueListView(
                         owner: repository.ownerName,
                         repo: repository.repoName,
-                        issueService: issueService
+                        issueService: issueService,
+                        attachmentService: attachmentService
                     )
                 case 1:
                     PullRequestListView(
                         owner: repository.ownerName,
                         repo: repository.repoName,
                         pullRequestService: pullRequestService,
-                        repositoryService: repositoryService
+                        repositoryService: repositoryService,
+                        attachmentService: attachmentService
                     )
                 default:
                     EmptyView()
@@ -66,6 +69,7 @@ struct RepositoryDetailView: View {
         let apiClient = APIClient(baseURL: serverURL, tokenProvider: { token })
         issueService = IssueService(apiClient: apiClient)
         pullRequestService = PullRequestService(apiClient: apiClient)
+        attachmentService = AttachmentService(apiClient: apiClient)
     }
 
     private var hasExpandableContent: Bool {

@@ -162,8 +162,8 @@ struct PullRequestDetailView: View {
             EditCommentSheet(
                 comment: comment,
                 isSaving: $isEditingComment
-            ) { newBody in
-                Task { await editComment(comment, newBody: newBody) }
+            ) { result in
+                Task { await editComment(comment, newBody: result.body) }
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)

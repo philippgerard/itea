@@ -33,6 +33,38 @@ final class APIClient: Sendable {
         try validateResponse(response)
     }
 
+    func uploadFile<T: Decodable & Sendable>(
+        _ endpoint: APIEndpoint,
+        fileData: Data,
+        fileName: String,
+        mimeType: String
+    ) async throws -> T {
+        let request = try buildMultipartRequest(
+            for: endpoint,
+            fileData: fileData,
+            fileName: fileName,
+            mimeType: mimeType
+        )
+        let (data, response) = try await performRequest(request)
+        return try decodeResponse(data: data, response: response)
+    }
+
+    func uploadFileWithoutResponse(
+        _ endpoint: APIEndpoint,
+        fileData: Data,
+        fileName: String,
+        mimeType: String
+    ) async throws {
+        let request = try buildMultipartRequest(
+            for: endpoint,
+            fileData: fileData,
+            fileName: fileName,
+            mimeType: mimeType
+        )
+        let (_, response) = try await performRequest(request)
+        try validateResponse(response)
+    }
+
     // MARK: - Private Methods
 
     private func buildRequest(for endpoint: APIEndpoint) throws -> URLRequest {
@@ -61,6 +93,44 @@ final class APIClient: Sendable {
             request.httpBody = try encoder.encode(AnyEncodable(body))
         }
 
+        return request
+    }
+
+    private func buildMultipartRequest(
+        for endpoint: APIEndpoint,
+        fileData: Data,
+        fileName: String,
+        mimeType: String
+    ) throws -> URLRequest {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent(endpoint.path),
+            resolvingAgainstBaseURL: true
+        )
+        components?.queryItems = endpoint.queryItems
+
+        guard let url = components?.url else {
+            throw APIError.invalidURL
+        }
+
+        let boundary = UUID().uuidString
+        var request = URLRequest(url: url)
+        request.httpMethod = endpoint.method.rawValue
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        if let token = tokenProvider() {
+            request.setValue("token \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        // Build multipart body
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"attachment\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        request.httpBody = body
         return request
     }
 

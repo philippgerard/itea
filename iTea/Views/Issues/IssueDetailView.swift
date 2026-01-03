@@ -1,15 +1,18 @@
 import SwiftUI
+import PhotosUI
 
 struct IssueDetailView: View {
     let issue: Issue
     let owner: String
     let repo: String
     let issueService: IssueService
+    let attachmentService: AttachmentService
     var onIssueUpdated: ((Issue) -> Void)?
 
     @EnvironmentObject private var authManager: AuthenticationManager
     @State private var currentIssue: Issue
     @State private var comments: [Comment] = []
+    @State private var attachments: [Attachment] = []
     @State private var isLoading = false
     @State private var newComment = ""
     @State private var isSubmitting = false
@@ -29,11 +32,20 @@ struct IssueDetailView: View {
     @State private var showEditIssue = false
     @State private var isEditingIssue = false
 
-    init(issue: Issue, owner: String, repo: String, issueService: IssueService, onIssueUpdated: ((Issue) -> Void)? = nil) {
+    // Attachment viewer
+    @State private var selectedAttachment: Attachment?
+
+    // Comment attachments
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var pendingCommentAttachments: [PendingAttachment] = []
+    @State private var isLoadingPhotos = false
+
+    init(issue: Issue, owner: String, repo: String, issueService: IssueService, attachmentService: AttachmentService, onIssueUpdated: ((Issue) -> Void)? = nil) {
         self.issue = issue
         self.owner = owner
         self.repo = repo
         self.issueService = issueService
+        self.attachmentService = attachmentService
         self.onIssueUpdated = onIssueUpdated
         self._currentIssue = State(initialValue: issue)
     }
@@ -125,9 +137,10 @@ struct IssueDetailView: View {
         .sheet(item: $commentToEdit) { comment in
             EditCommentSheet(
                 comment: comment,
+                token: authManager.getAccessToken(),
                 isSaving: $isEditingComment
-            ) { newBody in
-                Task { await editComment(comment, newBody: newBody) }
+            ) { result in
+                Task { await editComment(comment, result: result) }
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
@@ -135,15 +148,22 @@ struct IssueDetailView: View {
         .sheet(isPresented: $showEditIssue) {
             EditIssueSheet(
                 issue: currentIssue,
+                existingAttachments: attachments,
+                token: authManager.getAccessToken(),
                 isSaving: $isEditingIssue
-            ) { title, body in
-                Task { await editIssue(title: title, body: body) }
+            ) { result in
+                Task { await editIssue(result: result) }
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
         .task {
-            await loadComments()
+            async let commentsTask: () = loadComments()
+            async let attachmentsTask: () = loadAttachments()
+            _ = await (commentsTask, attachmentsTask)
+        }
+        .sheet(item: $selectedAttachment) { attachment in
+            AttachmentViewerSheet(attachment: attachment, token: authManager.getAccessToken())
         }
     }
 
@@ -221,6 +241,21 @@ struct IssueDetailView: View {
 
             // Content
             MarkdownText(content: body)
+
+            // Attachments
+            if !attachments.isEmpty {
+                Divider()
+                    .padding(.vertical, 4)
+
+                Text("Attachments")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+
+                AttachmentGridView(attachments: attachments, token: authManager.getAccessToken()) { attachment in
+                    selectedAttachment = attachment
+                }
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -261,8 +296,10 @@ struct IssueDetailView: View {
                     CommentView(
                         comment: comment,
                         currentUserId: authManager.currentUser?.id,
+                        token: authManager.getAccessToken(),
                         onEdit: { commentToEdit = $0 },
-                        onDelete: { commentToDelete = $0; showDeleteConfirmation = true }
+                        onDelete: { commentToDelete = $0; showDeleteConfirmation = true },
+                        onAttachmentTap: { selectedAttachment = $0 }
                     )
                 }
             }
@@ -271,42 +308,94 @@ struct IssueDetailView: View {
 
     // MARK: - Comment Input
 
-    private var commentInputBar: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            TextField("Add a comment...", text: $newComment, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...6)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color(uiColor: .secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .focused($isCommentFocused)
+    private var canSubmitComment: Bool {
+        !newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !pendingCommentAttachments.isEmpty
+    }
 
-            Button {
-                Task { await submitComment() }
-            } label: {
-                if isSubmitting {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 32, height: 32)
-                } else {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 32))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.accentColor)
+    private var commentInputBar: some View {
+        VStack(spacing: 0) {
+            // Pending attachments row
+            if !pendingCommentAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(pendingCommentAttachments) { attachment in
+                            PendingAttachmentThumbnailView(attachment: attachment) {
+                                pendingCommentAttachments.removeAll { $0.id == attachment.id }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                 }
             }
-            .buttonStyle(.plain)
-            .disabled(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
-            .animation(.easeInOut(duration: 0.15), value: newComment.isEmpty)
+
+            // Loading indicator
+            if isLoadingPhotos {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading photos...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+
+            // Input row
+            HStack(alignment: .center, spacing: 8) {
+                // Attachment button
+                PhotosPicker(
+                    selection: $selectedPhotos,
+                    maxSelectionCount: 5,
+                    matching: .any(of: [.images, .screenshots])
+                ) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 36))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+
+                TextField("Add a comment...", text: $newComment, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...6)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .focused($isCommentFocused)
+
+                Button {
+                    Task { await submitComment() }
+                } label: {
+                    if isSubmitting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 36, height: 36)
+                    } else {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 36))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(canSubmitComment ? Color.accentColor : Color.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSubmitComment || isSubmitting)
+                .animation(.easeInOut(duration: 0.15), value: canSubmitComment)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
         .background {
             Rectangle()
                 .fill(.bar)
                 .ignoresSafeArea(edges: .bottom)
                 .shadow(color: .black.opacity(0.06), radius: 3, y: -2)
+        }
+        .onChange(of: selectedPhotos) { _, newValue in
+            if !newValue.isEmpty {
+                Task { await loadSelectedPhotos() }
+            }
         }
     }
 
@@ -315,7 +404,8 @@ struct IssueDetailView: View {
     private func refresh() async {
         async let issueTask: () = refreshIssue()
         async let commentsTask: () = refreshComments()
-        _ = await (issueTask, commentsTask)
+        async let attachmentsTask: () = loadAttachments()
+        _ = await (issueTask, commentsTask, attachmentsTask)
     }
 
     private func refreshComments() async {
@@ -359,25 +449,116 @@ struct IssueDetailView: View {
         isLoading = false
     }
 
+    private func loadAttachments() async {
+        do {
+            attachments = try await attachmentService.getIssueAttachments(
+                owner: owner,
+                repo: repo,
+                index: currentIssue.number
+            )
+        } catch {
+            // Silently fail - attachments are supplementary
+        }
+    }
+
     private func submitComment() async {
         isSubmitting = true
         isCommentFocused = false
 
         do {
+            // Use a placeholder body if only attachments are provided
+            let commentBody = newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? (pendingCommentAttachments.isEmpty ? "" : " ")
+                : newComment
+
             let comment = try await issueService.createComment(
                 owner: owner,
                 repo: repo,
                 issueIndex: currentIssue.number,
-                body: newComment
+                body: commentBody
             )
-            comments.append(comment)
+
+            // Upload attachments if any
+            for attachment in pendingCommentAttachments {
+                _ = try await attachmentService.uploadCommentAttachment(
+                    owner: owner,
+                    repo: repo,
+                    commentId: comment.id,
+                    data: attachment.data,
+                    fileName: attachment.fileName,
+                    mimeType: attachment.mimeType
+                )
+            }
+
+            // Reload comments to get the updated comment with attachments
+            await refreshComments()
+
             newComment = ""
+            pendingCommentAttachments = []
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
 
         isSubmitting = false
+    }
+
+    private func loadSelectedPhotos() async {
+        guard !selectedPhotos.isEmpty else { return }
+
+        isLoadingPhotos = true
+        defer {
+            isLoadingPhotos = false
+            selectedPhotos = []
+        }
+
+        for item in selectedPhotos {
+            do {
+                if let data = try await item.loadTransferable(type: Data.self) {
+                    // Determine file name and type
+                    let fileName: String
+                    let mimeType: String
+
+                    if let contentType = item.supportedContentTypes.first {
+                        let ext = contentType.preferredFilenameExtension ?? "jpg"
+                        fileName = "image_\(UUID().uuidString.prefix(8)).\(ext)"
+                        mimeType = contentType.preferredMIMEType ?? "image/jpeg"
+                    } else {
+                        fileName = "image_\(UUID().uuidString.prefix(8)).jpg"
+                        mimeType = "image/jpeg"
+                    }
+
+                    // Create thumbnail
+                    let thumbnailData: Data?
+                    if let uiImage = UIImage(data: data) {
+                        let maxSize: CGFloat = 200
+                        let scale = min(maxSize / uiImage.size.width, maxSize / uiImage.size.height, 1.0)
+                        let newSize = CGSize(
+                            width: uiImage.size.width * scale,
+                            height: uiImage.size.height * scale
+                        )
+                        let renderer = UIGraphicsImageRenderer(size: newSize)
+                        let thumbnail = renderer.image { _ in
+                            uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                        }
+                        thumbnailData = thumbnail.jpegData(compressionQuality: 0.7)
+                    } else {
+                        thumbnailData = nil
+                    }
+
+                    let pending = PendingAttachment(
+                        data: data,
+                        fileName: fileName,
+                        mimeType: mimeType,
+                        thumbnail: thumbnailData
+                    )
+                    pendingCommentAttachments.append(pending)
+                }
+            } catch {
+                // Skip failed items
+                continue
+            }
+        }
     }
 
     private func toggleIssueState() async {
@@ -408,19 +589,44 @@ struct IssueDetailView: View {
         isTogglingState = false
     }
 
-    private func editComment(_ comment: Comment, newBody: String) async {
+    private func editComment(_ comment: Comment, result: CommentEditResult) async {
         isEditingComment = true
 
         do {
-            let updatedComment = try await issueService.editComment(
-                owner: owner,
-                repo: repo,
-                commentId: comment.id,
-                body: newBody
-            )
-            if let index = comments.firstIndex(where: { $0.id == comment.id }) {
-                comments[index] = updatedComment
+            // Delete attachments marked for removal
+            for attachment in result.attachmentsToDelete {
+                try await attachmentService.deleteCommentAttachment(
+                    owner: owner,
+                    repo: repo,
+                    commentId: comment.id,
+                    attachmentId: attachment.id
+                )
             }
+
+            // Update comment body only if it changed
+            if result.body != comment.body {
+                _ = try await issueService.editComment(
+                    owner: owner,
+                    repo: repo,
+                    commentId: comment.id,
+                    body: result.body
+                )
+            }
+
+            // Upload new attachments
+            for attachment in result.attachmentsToAdd {
+                try await attachmentService.uploadCommentAttachment(
+                    owner: owner,
+                    repo: repo,
+                    commentId: comment.id,
+                    data: attachment.data,
+                    fileName: attachment.fileName,
+                    mimeType: attachment.mimeType
+                )
+            }
+
+            // Refresh comments to get updated data
+            await refreshComments()
             commentToEdit = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -449,19 +655,49 @@ struct IssueDetailView: View {
         isDeletingComment = false
     }
 
-    private func editIssue(title: String, body: String) async {
+    private func editIssue(result: IssueEditResult) async {
         isEditingIssue = true
 
         do {
-            let updatedIssue = try await issueService.updateIssue(
-                owner: owner,
-                repo: repo,
-                index: currentIssue.number,
-                title: title,
-                body: body
-            )
-            currentIssue = updatedIssue
-            onIssueUpdated?(updatedIssue)
+            // Delete attachments marked for removal
+            for attachment in result.attachmentsToDelete {
+                try await attachmentService.deleteIssueAttachment(
+                    owner: owner,
+                    repo: repo,
+                    index: currentIssue.number,
+                    attachmentId: attachment.id
+                )
+            }
+
+            // Update issue title/body only if changed
+            let titleChanged = result.title != currentIssue.title
+            let bodyChanged = result.body != (currentIssue.body ?? "")
+            if titleChanged || bodyChanged {
+                let updatedIssue = try await issueService.updateIssue(
+                    owner: owner,
+                    repo: repo,
+                    index: currentIssue.number,
+                    title: result.title,
+                    body: result.body
+                )
+                currentIssue = updatedIssue
+                onIssueUpdated?(updatedIssue)
+            }
+
+            // Upload new attachments
+            for attachment in result.attachmentsToAdd {
+                _ = try await attachmentService.uploadIssueAttachment(
+                    owner: owner,
+                    repo: repo,
+                    index: currentIssue.number,
+                    data: attachment.data,
+                    fileName: attachment.fileName,
+                    mimeType: attachment.mimeType
+                )
+            }
+
+            // Refresh attachments to get updated data
+            await loadAttachments()
             showEditIssue = false
         } catch {
             errorMessage = error.localizedDescription

@@ -5,6 +5,7 @@ struct PullRequestListView: View {
     let repo: String
     let pullRequestService: PullRequestService
     let repositoryService: RepositoryService
+    let attachmentService: AttachmentService
 
     @State private var pullRequests: [PullRequest] = []
     @State private var isLoading = false

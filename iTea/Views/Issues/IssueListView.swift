@@ -4,6 +4,7 @@ struct IssueListView: View {
     let owner: String
     let repo: String
     let issueService: IssueService
+    let attachmentService: AttachmentService
 
     @State private var issues: [Issue] = []
     @State private var isLoading = false
@@ -72,7 +73,12 @@ struct IssueListView: View {
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .sheet(isPresented: $showCreateIssue) {
-            CreateIssueView(owner: owner, repo: repo, issueService: issueService) {
+            CreateIssueView(
+                owner: owner,
+                repo: repo,
+                issueService: issueService,
+                attachmentService: attachmentService
+            ) {
                 Task { await loadIssues() }
             }
             #if targetEnvironment(macCatalyst)
@@ -116,7 +122,8 @@ struct IssueListView: View {
                 issue: issue,
                 owner: owner,
                 repo: repo,
-                issueService: issueService
+                issueService: issueService,
+                attachmentService: attachmentService
             )
         }
     }
