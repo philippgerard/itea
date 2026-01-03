@@ -17,15 +17,11 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
-        .confirmationDialog(
-            "Sign Out",
-            isPresented: $showLogoutConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert("Sign Out", isPresented: $showLogoutConfirmation) {
+            Button("Cancel", role: .cancel) { }
             Button("Sign Out", role: .destructive) {
                 Task { await authManager.logout() }
             }
-            Button("Cancel", role: .cancel) { }
         } message: {
             Text("Are you sure you want to sign out?")
         }

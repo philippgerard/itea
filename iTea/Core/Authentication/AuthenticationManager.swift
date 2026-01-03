@@ -2,12 +2,11 @@ import Foundation
 import SwiftUI
 
 @MainActor
-@Observable
 final class AuthenticationManager: ObservableObject {
-    private(set) var isAuthenticated = false
-    private(set) var isCheckingAuth = true
-    private(set) var currentUser: User?
-    private(set) var serverURL: URL?
+    @Published private(set) var isAuthenticated = false
+    @Published private(set) var isCheckingAuth = true
+    @Published private(set) var currentUser: User?
+    @Published private(set) var serverURL: URL?
 
     private let tokenStorage = TokenStorage()
     private var accessToken: String?

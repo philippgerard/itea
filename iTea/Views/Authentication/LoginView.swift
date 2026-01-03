@@ -14,117 +14,83 @@ struct LoginView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer(minLength: 60)
+                    Spacer(minLength: geometry.size.height * 0.12)
 
-                    // Logo and title
-                    VStack(spacing: 16) {
-                        Image(systemName: "cup.and.saucer.fill")
-                            .font(.system(size: 56))
-                            .foregroundStyle(.green)
-
+                    // Logo
+                    VStack(spacing: 6) {
                         Text("iTea")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                        Text("A Gitea client")
+                        Text("A Gitea client for iOS")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.bottom, 48)
 
-                    // Form card
-                    VStack(spacing: 24) {
+                    // Glass card
+                    VStack(spacing: 0) {
                         // Server URL field
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Server URL")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.secondary)
+                        TextField("Server URL", text: $serverURL)
+                            .textContentType(.URL)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            #if !targetEnvironment(macCatalyst)
+                            .keyboardType(.URL)
+                            #endif
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
 
-                            TextField("", text: $serverURL, prompt: Text("gitea.example.com"))
-                                .textFieldStyle(.plain)
-                                .textContentType(.URL)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                                #if !targetEnvironment(macCatalyst)
-                                .keyboardType(.URL)
-                                #endif
-                                .padding(12)
-                                .background(.ultraThinMaterial)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
+                        Divider()
+                            .padding(.leading, 16)
 
                         // Access Token field
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Access Token")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.secondary)
-
-                                Spacer()
-
-                                Button {
-                                    showTokenInfo = true
-                                } label: {
-                                    Image(systemName: "questionmark.circle")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            SecureField("", text: $accessToken, prompt: Text("Paste your token here"))
-                                .textFieldStyle(.plain)
+                        HStack(spacing: 12) {
+                            SecureField("Access Token", text: $accessToken)
                                 .textContentType(.password)
-                                .padding(12)
-                                .background(.ultraThinMaterial)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
 
-                        // Sign In button
-                        Button {
-                            Task { await login() }
-                        } label: {
-                            Group {
-                                if isLoading {
-                                    ProgressView()
-                                } else {
-                                    Text("Sign In")
-                                        .fontWeight(.semibold)
-                                }
+                            Button {
+                                showTokenInfo = true
+                            } label: {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.secondary)
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
+                            .buttonStyle(.plain)
                         }
-                        .disabled(!isFormValid || isLoading)
-                        .buttonStyle(.borderedProminent)
-                        .padding(.top, 8)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
                     }
-                    .padding(24)
-                    .background(.regularMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .frame(maxWidth: 400)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal, 20)
 
-                    // Help link
+                    // Sign In button
                     Button {
-                        showTokenInfo = true
+                        Task { await login() }
                     } label: {
-                        Text("How to create an access token")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        Group {
+                            if isLoading {
+                                ProgressView()
+                            } else {
+                                Text("Sign In")
+                                    .font(.system(size: 17, weight: .semibold))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.top, 24)
+                    .disabled(!isFormValid || isLoading)
+                    .foregroundStyle(isFormValid && !isLoading ? .primary : .secondary)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
 
-                    Spacer(minLength: 60)
+                    Spacer(minLength: geometry.size.height * 0.15)
                 }
                 .frame(minHeight: geometry.size.height)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .scrollBounceBehavior(.basedOnSize)
         }
+        .background(Color(.systemGroupedBackground))
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -140,7 +106,6 @@ struct LoginView: View {
     }
 
     private func login() async {
-        // Normalize the URL - add https:// if no scheme provided
         var urlString = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if !urlString.contains("://") {
             urlString = "https://" + urlString
@@ -171,33 +136,26 @@ struct TokenInfoSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("Creating an Access Token")
-                        .font(.title2)
-                        .fontWeight(.bold)
+            List {
+                Section {
+                    StepView(number: 1, text: "Open your Gitea instance in a browser")
+                    StepView(number: 2, text: "Go to Settings → Applications")
+                    StepView(number: 3, text: "Enter a name for your token")
+                    StepView(number: 4, text: "Select scopes: user, repository, issue, notification")
+                    StepView(number: 5, text: "Click Generate Token")
+                    StepView(number: 6, text: "Copy and paste the token here")
+                } header: {
+                    Text("Steps")
+                }
 
-                    VStack(alignment: .leading, spacing: 20) {
-                        StepView(number: 1, text: "Open your Gitea instance in a browser")
-                        StepView(number: 2, text: "Go to Settings → Applications")
-                        StepView(number: 3, text: "Enter a name for your token")
-                        StepView(number: 4, text: "Select scopes: user, repository, issue, notification")
-                        StepView(number: 5, text: "Click Generate Token")
-                        StepView(number: 6, text: "Copy and paste the token here")
-                    }
-
+                Section {
                     HStack(spacing: 12) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                         Text("Copy your token immediately — it won't be shown again.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
                     }
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .padding(24)
             }
             .navigationTitle("Access Token")
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
@@ -207,7 +165,6 @@ struct TokenInfoSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .buttonStyle(.bordered)
                 }
             }
         }
@@ -219,7 +176,7 @@ struct StepView: View {
     let text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             Text("\(number)")
                 .font(.footnote)
                 .fontWeight(.bold)
@@ -230,8 +187,8 @@ struct StepView: View {
 
             Text(text)
                 .font(.body)
-                .foregroundStyle(.primary)
         }
+        .padding(.vertical, 4)
     }
 }
 
