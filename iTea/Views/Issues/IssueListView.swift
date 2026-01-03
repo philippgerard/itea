@@ -66,9 +66,8 @@ struct IssueListView: View {
                     showCreateIssue = true
                 } label: {
                     Image(systemName: "plus")
+                        .fontWeight(.medium)
                 }
-                .buttonStyle(.bordered)
-                .tint(.secondary)
             }
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)

@@ -67,9 +67,8 @@ struct PullRequestListView: View {
                     showCreatePR = true
                 } label: {
                     Image(systemName: "plus")
+                        .fontWeight(.medium)
                 }
-                .buttonStyle(.bordered)
-                .tint(.secondary)
             }
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
