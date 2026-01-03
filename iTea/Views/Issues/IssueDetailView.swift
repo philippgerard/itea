@@ -7,6 +7,7 @@ struct IssueDetailView: View {
     let issueService: IssueService
     var onIssueUpdated: ((Issue) -> Void)?
 
+    @EnvironmentObject private var authManager: AuthenticationManager
     @State private var currentIssue: Issue
     @State private var comments: [Comment] = []
     @State private var isLoading = false
@@ -17,6 +18,17 @@ struct IssueDetailView: View {
     @State private var showError = false
     @FocusState private var isCommentFocused: Bool
 
+    // Comment editing state
+    @State private var commentToEdit: Comment?
+    @State private var commentToDelete: Comment?
+    @State private var isEditingComment = false
+    @State private var isDeletingComment = false
+    @State private var showDeleteConfirmation = false
+
+    // Issue editing state
+    @State private var showEditIssue = false
+    @State private var isEditingIssue = false
+
     init(issue: Issue, owner: String, repo: String, issueService: IssueService, onIssueUpdated: ((Issue) -> Void)? = nil) {
         self.issue = issue
         self.owner = owner
@@ -24,6 +36,11 @@ struct IssueDetailView: View {
         self.issueService = issueService
         self.onIssueUpdated = onIssueUpdated
         self._currentIssue = State(initialValue: issue)
+    }
+
+    private var canEditIssue: Bool {
+        guard let currentUserId = authManager.currentUser?.id else { return false }
+        return currentIssue.user.id == currentUserId
     }
 
     var body: some View {
@@ -58,6 +75,16 @@ struct IssueDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    if canEditIssue {
+                        Button {
+                            showEditIssue = true
+                        } label: {
+                            SwiftUI.Label("Edit", systemImage: "pencil")
+                        }
+
+                        Divider()
+                    }
+
                     Button {
                         Task { await toggleIssueState() }
                     } label: {
@@ -69,7 +96,7 @@ struct IssueDetailView: View {
                     }
                     .disabled(isTogglingState)
                 } label: {
-                    if isTogglingState {
+                    if isTogglingState || isEditingIssue {
                         ProgressView()
                             .controlSize(.small)
                     } else {
@@ -82,6 +109,38 @@ struct IssueDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "Unknown error")
+        }
+        .alert("Delete Comment?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                if let comment = commentToDelete {
+                    Task { await deleteComment(comment) }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                commentToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
+        .sheet(item: $commentToEdit) { comment in
+            EditCommentSheet(
+                comment: comment,
+                isSaving: $isEditingComment
+            ) { newBody in
+                Task { await editComment(comment, newBody: newBody) }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showEditIssue) {
+            EditIssueSheet(
+                issue: currentIssue,
+                isSaving: $isEditingIssue
+            ) { title, body in
+                Task { await editIssue(title: title, body: body) }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .task {
             await loadComments()
@@ -199,9 +258,13 @@ struct IssueDetailView: View {
                     .padding(.vertical, 20)
             } else {
                 ForEach(comments) { comment in
-                    CommentView(comment: comment)
+                    CommentView(
+                        comment: comment,
+                        currentUserId: authManager.currentUser?.id,
+                        onEdit: { commentToEdit = $0 },
+                        onDelete: { commentToDelete = $0; showDeleteConfirmation = true }
+                    )
                 }
-
             }
         }
     }
@@ -343,5 +406,68 @@ struct IssueDetailView: View {
         }
 
         isTogglingState = false
+    }
+
+    private func editComment(_ comment: Comment, newBody: String) async {
+        isEditingComment = true
+
+        do {
+            let updatedComment = try await issueService.editComment(
+                owner: owner,
+                repo: repo,
+                commentId: comment.id,
+                body: newBody
+            )
+            if let index = comments.firstIndex(where: { $0.id == comment.id }) {
+                comments[index] = updatedComment
+            }
+            commentToEdit = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+
+        isEditingComment = false
+    }
+
+    private func deleteComment(_ comment: Comment) async {
+        isDeletingComment = true
+
+        do {
+            try await issueService.deleteComment(
+                owner: owner,
+                repo: repo,
+                commentId: comment.id
+            )
+            comments.removeAll { $0.id == comment.id }
+            commentToDelete = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+
+        isDeletingComment = false
+    }
+
+    private func editIssue(title: String, body: String) async {
+        isEditingIssue = true
+
+        do {
+            let updatedIssue = try await issueService.updateIssue(
+                owner: owner,
+                repo: repo,
+                index: currentIssue.number,
+                title: title,
+                body: body
+            )
+            currentIssue = updatedIssue
+            onIssueUpdated?(updatedIssue)
+            showEditIssue = false
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+
+        isEditingIssue = false
     }
 }

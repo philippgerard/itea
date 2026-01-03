@@ -159,6 +159,21 @@ struct APIEndpoint: Sendable {
         )
     }
 
+    static func editComment(owner: String, repo: String, commentId: Int, body: String) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/issues/comments/\(commentId)",
+            method: .patch,
+            body: CreateCommentBody(body: body)
+        )
+    }
+
+    static func deleteComment(owner: String, repo: String, commentId: Int) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/\(owner)/\(repo)/issues/comments/\(commentId)",
+            method: .delete
+        )
+    }
+
     // MARK: - Pull Request Endpoints
 
     static func pullRequests(owner: String, repo: String, state: String = "open", page: Int = 1, limit: Int = 20) -> APIEndpoint {

@@ -2,6 +2,21 @@ import SwiftUI
 
 struct CommentView: View {
     let comment: Comment
+    let currentUserId: Int?
+    var onEdit: ((Comment) -> Void)?
+    var onDelete: ((Comment) -> Void)?
+
+    init(comment: Comment, currentUserId: Int? = nil, onEdit: ((Comment) -> Void)? = nil, onDelete: ((Comment) -> Void)? = nil) {
+        self.comment = comment
+        self.currentUserId = currentUserId
+        self.onEdit = onEdit
+        self.onDelete = onDelete
+    }
+
+    private var canModify: Bool {
+        guard let currentUserId else { return false }
+        return comment.user.id == currentUserId
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -30,6 +45,29 @@ struct CommentView: View {
                 }
 
                 Spacer()
+
+                // Edit menu button (only for own comments)
+                if canModify {
+                    Menu {
+                        Button {
+                            onEdit?(comment)
+                        } label: {
+                            SwiftUI.Label("Edit", systemImage: "pencil")
+                        }
+
+                        Button(role: .destructive) {
+                            onDelete?(comment)
+                        } label: {
+                            SwiftUI.Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(8)
+                            .contentShape(Rectangle())
+                    }
+                }
             }
 
             // Content
@@ -39,6 +77,21 @@ struct CommentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contextMenu {
+            if canModify {
+                Button {
+                    onEdit?(comment)
+                } label: {
+                    SwiftUI.Label("Edit", systemImage: "pencil")
+                }
+
+                Button(role: .destructive) {
+                    onDelete?(comment)
+                } label: {
+                    SwiftUI.Label("Delete", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 

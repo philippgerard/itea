@@ -7,6 +7,7 @@ struct PullRequestDetailView: View {
     let pullRequestService: PullRequestService
     var onPullRequestUpdated: ((PullRequest) -> Void)?
 
+    @EnvironmentObject private var authManager: AuthenticationManager
     @State private var currentPR: PullRequest
     @State private var comments: [Comment] = []
     @State private var commitStatus: CombinedStatus?
@@ -23,6 +24,17 @@ struct PullRequestDetailView: View {
     @State private var statusPollingTask: Task<Void, Never>?
     @FocusState private var isCommentFocused: Bool
 
+    // Comment editing state
+    @State private var commentToEdit: Comment?
+    @State private var commentToDelete: Comment?
+    @State private var isEditingComment = false
+    @State private var isDeletingComment = false
+    @State private var showDeleteConfirmation = false
+
+    // PR editing state
+    @State private var showEditPR = false
+    @State private var isEditingPR = false
+
     init(pullRequest: PullRequest, owner: String, repo: String, pullRequestService: PullRequestService, onPullRequestUpdated: ((PullRequest) -> Void)? = nil) {
         self.pullRequest = pullRequest
         self.owner = owner
@@ -30,6 +42,11 @@ struct PullRequestDetailView: View {
         self.pullRequestService = pullRequestService
         self.onPullRequestUpdated = onPullRequestUpdated
         self._currentPR = State(initialValue: pullRequest)
+    }
+
+    private var canEditPR: Bool {
+        guard let currentUserId = authManager.currentUser?.id else { return false }
+        return currentPR.user.id == currentUserId
     }
 
     var body: some View {
@@ -69,6 +86,16 @@ struct PullRequestDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    if canEditPR {
+                        Button {
+                            showEditPR = true
+                        } label: {
+                            SwiftUI.Label("Edit", systemImage: "pencil")
+                        }
+
+                        Divider()
+                    }
+
                     // Merge option (only for open, mergeable PRs)
                     if currentPR.isOpen && !currentPR.isMerged {
                         Button {
@@ -95,7 +122,7 @@ struct PullRequestDetailView: View {
                         .disabled(isTogglingState)
                     }
                 } label: {
-                    if isTogglingState || isMerging {
+                    if isTogglingState || isMerging || isEditingPR {
                         ProgressView()
                             .controlSize(.small)
                     } else {
@@ -118,6 +145,38 @@ struct PullRequestDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "Unknown error")
+        }
+        .alert("Delete Comment?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                if let comment = commentToDelete {
+                    Task { await deleteComment(comment) }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                commentToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
+        .sheet(item: $commentToEdit) { comment in
+            EditCommentSheet(
+                comment: comment,
+                isSaving: $isEditingComment
+            ) { newBody in
+                Task { await editComment(comment, newBody: newBody) }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showEditPR) {
+            EditPullRequestSheet(
+                pullRequest: currentPR,
+                isSaving: $isEditingPR
+            ) { title, body in
+                Task { await editPullRequest(title: title, body: body) }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .task {
             await loadComments()
@@ -473,9 +532,13 @@ struct PullRequestDetailView: View {
                     .padding(.vertical, 20)
             } else {
                 ForEach(comments) { comment in
-                    CommentView(comment: comment)
+                    CommentView(
+                        comment: comment,
+                        currentUserId: authManager.currentUser?.id,
+                        onEdit: { commentToEdit = $0 },
+                        onDelete: { commentToDelete = $0; showDeleteConfirmation = true }
+                    )
                 }
-
             }
         }
     }
@@ -709,6 +772,69 @@ struct PullRequestDetailView: View {
         }
 
         isMerging = false
+    }
+
+    private func editComment(_ comment: Comment, newBody: String) async {
+        isEditingComment = true
+
+        do {
+            let updatedComment = try await pullRequestService.editComment(
+                owner: owner,
+                repo: repo,
+                commentId: comment.id,
+                body: newBody
+            )
+            if let index = comments.firstIndex(where: { $0.id == comment.id }) {
+                comments[index] = updatedComment
+            }
+            commentToEdit = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+
+        isEditingComment = false
+    }
+
+    private func deleteComment(_ comment: Comment) async {
+        isDeletingComment = true
+
+        do {
+            try await pullRequestService.deleteComment(
+                owner: owner,
+                repo: repo,
+                commentId: comment.id
+            )
+            comments.removeAll { $0.id == comment.id }
+            commentToDelete = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+
+        isDeletingComment = false
+    }
+
+    private func editPullRequest(title: String, body: String) async {
+        isEditingPR = true
+
+        do {
+            let updatedPR = try await pullRequestService.updatePullRequest(
+                owner: owner,
+                repo: repo,
+                index: currentPR.number,
+                title: title,
+                body: body
+            )
+            currentPR = updatedPR
+            onPullRequestUpdated?(updatedPR)
+            showEditPR = false
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+
+        isEditingPR = false
     }
 }
 

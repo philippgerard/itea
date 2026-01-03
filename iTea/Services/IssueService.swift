@@ -41,6 +41,14 @@ final class IssueService: Sendable {
         try await apiClient.request(.createIssueComment(owner: owner, repo: repo, index: issueIndex, body: body))
     }
 
+    func editComment(owner: String, repo: String, commentId: Int, body: String) async throws -> Comment {
+        try await apiClient.request(.editComment(owner: owner, repo: repo, commentId: commentId, body: body))
+    }
+
+    func deleteComment(owner: String, repo: String, commentId: Int) async throws {
+        try await apiClient.requestWithoutResponse(.deleteComment(owner: owner, repo: repo, commentId: commentId))
+    }
+
     func searchIssues(query: String, page: Int = 1, limit: Int = 20) async throws -> [Issue] {
         try await apiClient.request(.searchIssues(query: query, page: page, limit: limit))
     }
