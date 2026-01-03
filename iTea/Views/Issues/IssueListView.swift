@@ -68,6 +68,7 @@ struct IssueListView: View {
                     Image(systemName: "plus")
                 }
                 .buttonStyle(.bordered)
+                .tint(.secondary)
             }
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)

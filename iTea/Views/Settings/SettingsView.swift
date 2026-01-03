@@ -5,11 +5,17 @@ struct SettingsView: View {
     @State private var showLogoutConfirmation = false
     @State private var showLicenses = false
     @AppStorage("quickMentionText") private var quickMentionText = "@claude"
+    @AppStorage("accentColor") private var accentColorRaw: String = AccentColorOption.system.rawValue
+
+    private var selectedAccentColor: AccentColorOption {
+        AccentColorOption(rawValue: accentColorRaw) ?? .system
+    }
 
     var body: some View {
         NavigationStack {
             List {
                 accountSection
+                appearanceSection
                 quickActionsSection
                 aboutSection
                 legalSection
@@ -64,6 +70,43 @@ struct SettingsView: View {
         }
     }
 
+    private var appearanceSection: some View {
+        Section("Appearance") {
+            HStack {
+                Text("Accent Color")
+                Spacer()
+                Menu {
+                    ForEach(AccentColorOption.allCases) { option in
+                        Button {
+                            accentColorRaw = option.rawValue
+                        } label: {
+                            HStack {
+                                Circle()
+                                    .fill(option.previewColor)
+                                    .frame(width: 12, height: 12)
+                                Text(option.displayName)
+                                if option == selectedAccentColor {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(selectedAccentColor.previewColor)
+                            .frame(width: 16, height: 16)
+                        Text(selectedAccentColor.displayName)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+    }
+
     private var quickActionsSection: some View {
         Section {
             HStack {
@@ -97,6 +140,15 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Link(destination: URL(string: "https://github.com/philippgerard/itea")!) {
+                HStack {
+                    Text("GitHub Repository")
+                    Spacer()
+                    Image(systemName: "arrow.up.right.square")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Link(destination: URL(string: "https://docs.gitea.com/api/1.24/")!) {
                 HStack {
                     Text("Gitea API Documentation")
@@ -110,6 +162,15 @@ struct SettingsView: View {
 
     private var legalSection: some View {
         Section("Legal") {
+            Link(destination: URL(string: "https://github.com/philippgerard/itea/blob/main/LICENSE")!) {
+                HStack {
+                    Text("MIT License")
+                    Spacer()
+                    Image(systemName: "arrow.up.right.square")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Link(destination: URL(string: "https://github.com/philippgerard/itea/blob/main/PRIVACY.md")!) {
                 HStack {
                     Text("Privacy Policy")

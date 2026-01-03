@@ -65,3 +65,44 @@ struct StatusColors {
     static let warning = Color.orange
     static let pending = Color.yellow
 }
+
+// MARK: - Accent Colors
+
+enum AccentColorOption: String, CaseIterable, Identifiable {
+    case system = "system"
+    case green = "green"
+    case blue = "blue"
+    case purple = "purple"
+    case orange = "orange"
+    case pink = "pink"
+    case red = "red"
+    case teal = "teal"
+    case indigo = "indigo"
+
+    var id: String { rawValue }
+
+    var color: Color? {
+        switch self {
+        case .system: return nil
+        case .green: return .green
+        case .blue: return .blue
+        case .purple: return .purple
+        case .orange: return .orange
+        case .pink: return .pink
+        case .red: return .red
+        case .teal: return .teal
+        case .indigo: return .indigo
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .system: return "Follow System"
+        default: return rawValue.capitalized
+        }
+    }
+
+    var previewColor: Color {
+        color ?? .accentColor
+    }
+}

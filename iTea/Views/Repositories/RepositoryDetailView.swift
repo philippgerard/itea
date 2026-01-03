@@ -109,12 +109,6 @@ struct RepositoryDetailView: View {
                                 Text("\(forks)")
                             }
                         }
-                        if let issues = repository.openIssuesCount, issues > 0 {
-                            HStack(spacing: 2) {
-                                Image(systemName: "exclamationmark.circle")
-                                Text("\(issues)")
-                            }
-                        }
                     }
                     .font(.caption)
                     .foregroundStyle(.tertiary)

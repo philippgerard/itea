@@ -2,6 +2,11 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthenticationManager
+    @AppStorage("accentColor") private var accentColorRaw: String = AccentColorOption.system.rawValue
+
+    private var accentColor: Color? {
+        AccentColorOption(rawValue: accentColorRaw)?.color
+    }
 
     var body: some View {
         Group {
@@ -13,6 +18,7 @@ struct ContentView: View {
                 LoginView()
             }
         }
+        .tint(accentColor)
         .animation(.default, value: authManager.isAuthenticated)
     }
 }

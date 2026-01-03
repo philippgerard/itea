@@ -61,6 +61,11 @@ struct LoginView: View {
                         .padding(.vertical, 14)
                     }
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(Color(uiColor: .separator), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, 20)
 
                     // Sign In button
@@ -81,6 +86,11 @@ struct LoginView: View {
                     .disabled(!isFormValid || isLoading)
                     .foregroundStyle(isFormValid && !isLoading ? .primary : .secondary)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(Color(uiColor: .separator), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
 
