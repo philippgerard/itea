@@ -4,12 +4,16 @@ struct RepositoryListView: View {
     let repositoryService: RepositoryService
 
     @EnvironmentObject var authManager: AuthenticationManager
+    @Environment(DeepLinkHandler.self) private var deepLinkHandler: DeepLinkHandler?
     @State private var repositories: [Repository] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var searchText = ""
     @State private var currentPage = 1
     @State private var hasMorePages = true
+    @State private var navigationPath = NavigationPath()
+    @State private var issueService: IssueService?
+    @State private var pullRequestService: PullRequestService?
 
     var filteredRepositories: [Repository] {
         if searchText.isEmpty {
@@ -22,7 +26,7 @@ struct RepositoryListView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if isLoading && repositories.isEmpty {
                     ProgressView("Loading repositories...")
@@ -53,8 +57,79 @@ struct RepositoryListView: View {
                 await loadRepositories()
             }
             .task {
+                setupServices()
                 await loadRepositories()
             }
+            .onChange(of: deepLinkHandler?.pendingAction) { _, newAction in
+                handleDeepLinkAction(newAction)
+            }
+        }
+    }
+
+    private func setupServices() {
+        guard issueService == nil else { return }
+
+        guard let serverURL = authManager.getServerURL(),
+              let token = authManager.getAccessToken() else { return }
+
+        let apiClient = APIClient(baseURL: serverURL, tokenProvider: { token })
+        issueService = IssueService(apiClient: apiClient)
+        pullRequestService = PullRequestService(apiClient: apiClient)
+    }
+
+    private func handleDeepLinkAction(_ action: DeepLinkAction?) {
+        guard let action else { return }
+
+        Task {
+            switch action {
+            case .viewRepository(let owner, let repo):
+                await navigateToRepository(owner: owner, repo: repo)
+                deepLinkHandler?.clearPendingAction()
+
+            case .viewIssue(let owner, let repo, let number):
+                await navigateToIssue(owner: owner, repo: repo, number: number)
+                deepLinkHandler?.clearPendingAction()
+
+            case .viewPullRequest(let owner, let repo, let number):
+                await navigateToPullRequest(owner: owner, repo: repo, number: number)
+                deepLinkHandler?.clearPendingAction()
+
+            case .createPullRequest:
+                break // Handled by MainTabView
+            }
+        }
+    }
+
+    private func navigateToRepository(owner: String, repo: String) async {
+        do {
+            let repository = try await repositoryService.getRepository(owner: owner, repo: repo)
+            navigationPath.append(repository)
+        } catch {
+            // Silently fail - could show error
+        }
+    }
+
+    private func navigateToIssue(owner: String, repo: String, number: Int) async {
+        guard let issueService else { return }
+        do {
+            let repository = try await repositoryService.getRepository(owner: owner, repo: repo)
+            let issue = try await issueService.getIssue(owner: owner, repo: repo, index: number)
+            navigationPath.append(repository)
+            navigationPath.append(IssueNavigationItem(issue: issue, owner: owner, repo: repo))
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private func navigateToPullRequest(owner: String, repo: String, number: Int) async {
+        guard let pullRequestService else { return }
+        do {
+            let repository = try await repositoryService.getRepository(owner: owner, repo: repo)
+            let pr = try await pullRequestService.getPullRequest(owner: owner, repo: repo, index: number)
+            navigationPath.append(repository)
+            navigationPath.append(PRNavigationItem(pullRequest: pr, owner: owner, repo: repo))
+        } catch {
+            // Silently fail
         }
     }
 
@@ -83,6 +158,26 @@ struct RepositoryListView: View {
         .listStyle(.plain)
         .navigationDestination(for: Repository.self) { repository in
             RepositoryDetailView(repository: repository, repositoryService: repositoryService)
+        }
+        .navigationDestination(for: IssueNavigationItem.self) { item in
+            if let issueService {
+                IssueDetailView(
+                    issue: item.issue,
+                    owner: item.owner,
+                    repo: item.repo,
+                    issueService: issueService
+                )
+            }
+        }
+        .navigationDestination(for: PRNavigationItem.self) { item in
+            if let pullRequestService {
+                PullRequestDetailView(
+                    pullRequest: item.pullRequest,
+                    owner: item.owner,
+                    repo: item.repo,
+                    pullRequestService: pullRequestService
+                )
+            }
         }
     }
 
@@ -120,6 +215,20 @@ struct RepositoryListView: View {
 
         isLoading = false
     }
+}
+
+// MARK: - Navigation Items
+
+struct IssueNavigationItem: Hashable {
+    let issue: Issue
+    let owner: String
+    let repo: String
+}
+
+struct PRNavigationItem: Hashable {
+    let pullRequest: PullRequest
+    let owner: String
+    let repo: String
 }
 
 #Preview {

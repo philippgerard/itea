@@ -26,4 +26,9 @@ final class RepositoryService: Sendable {
     func unwatchRepository(owner: String, repo: String) async throws {
         try await apiClient.requestWithoutResponse(.unwatchRepository(owner: owner, repo: repo))
     }
+
+    func searchRepositories(query: String, page: Int = 1, limit: Int = 20) async throws -> [Repository] {
+        let response: RepositorySearchResponse = try await apiClient.request(.searchRepositories(query: query, page: page, limit: limit))
+        return response.data
+    }
 }

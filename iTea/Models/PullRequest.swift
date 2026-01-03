@@ -19,6 +19,8 @@ struct PullRequest: Codable, Identifiable, Hashable, Sendable {
     let comments: Int?
     let createdAt: Date?
     let updatedAt: Date?
+    /// Repository info - only present in search results
+    let repository: IssueRepository?
 
     var isOpen: Bool {
         state == "open"

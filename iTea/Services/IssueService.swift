@@ -40,4 +40,8 @@ final class IssueService: Sendable {
     func createComment(owner: String, repo: String, issueIndex: Int, body: String) async throws -> Comment {
         try await apiClient.request(.createIssueComment(owner: owner, repo: repo, index: issueIndex, body: body))
     }
+
+    func searchIssues(query: String, page: Int = 1, limit: Int = 20) async throws -> [Issue] {
+        try await apiClient.request(.searchIssues(query: query, page: page, limit: limit))
+    }
 }

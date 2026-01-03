@@ -14,6 +14,8 @@ struct Issue: Codable, Identifiable, Hashable, Sendable {
     let createdAt: Date?
     let updatedAt: Date?
     let closedAt: Date?
+    /// Repository info - only present in search results
+    let repository: IssueRepository?
 
     var isOpen: Bool {
         state == "open"
@@ -28,4 +30,12 @@ struct Issue: Codable, Identifiable, Hashable, Sendable {
         guard let assignees else { return false }
         return !assignees.isEmpty
     }
+}
+
+/// Lightweight repository info included in issue/PR search results
+struct IssueRepository: Codable, Hashable, Sendable {
+    let id: Int
+    let name: String
+    let owner: String
+    let fullName: String
 }

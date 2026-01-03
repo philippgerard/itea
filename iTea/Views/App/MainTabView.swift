@@ -69,10 +69,19 @@ struct MainTabView: View {
             setupServices()
         }
         .onChange(of: deepLinkHandler?.pendingAction) { _, newAction in
-            if case .createPullRequest = newAction {
+            guard let newAction else { return }
+
+            switch newAction {
+            case .createPullRequest:
                 pendingPRAction = newAction
                 showCreatePRSheet = true
                 deepLinkHandler?.clearPendingAction()
+
+            case .viewRepository, .viewIssue, .viewPullRequest:
+                // Switch to repositories tab and let RepositoryListView handle navigation
+                selectedTab = .repositories
+                selectedItem = .repositories
+
             }
         }
         .sheet(isPresented: $showCreatePRSheet) {

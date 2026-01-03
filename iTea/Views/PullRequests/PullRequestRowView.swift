@@ -94,7 +94,8 @@ struct PullRequestRowView: View {
             mergedBy: nil,
             comments: 3,
             createdAt: Date(),
-            updatedAt: nil
+            updatedAt: nil,
+            repository: nil
         )
     )
     .padding()

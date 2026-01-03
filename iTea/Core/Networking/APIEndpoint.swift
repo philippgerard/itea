@@ -51,6 +51,45 @@ struct APIEndpoint: Sendable {
         APIEndpoint(path: "/repos/\(owner)/\(repo)")
     }
 
+    static func searchRepositories(query: String, page: Int = 1, limit: Int = 20) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/search",
+            queryItems: [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "page", value: "\(page)"),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+    }
+
+    // MARK: - Issue Search Endpoints
+
+    static func searchIssues(query: String, state: String = "all", page: Int = 1, limit: Int = 20) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/issues/search",
+            queryItems: [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "state", value: state),
+                URLQueryItem(name: "type", value: "issues"),
+                URLQueryItem(name: "page", value: "\(page)"),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+    }
+
+    static func searchPullRequests(query: String, state: String = "all", page: Int = 1, limit: Int = 20) -> APIEndpoint {
+        APIEndpoint(
+            path: "/repos/issues/search",
+            queryItems: [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "state", value: state),
+                URLQueryItem(name: "type", value: "pulls"),
+                URLQueryItem(name: "page", value: "\(page)"),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+    }
+
     static func watchRepository(owner: String, repo: String) -> APIEndpoint {
         APIEndpoint(
             path: "/repos/\(owner)/\(repo)/subscription",

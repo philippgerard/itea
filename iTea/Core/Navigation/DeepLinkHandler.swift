@@ -3,6 +3,7 @@ import SwiftUI
 /// Represents a pending deep link action
 enum DeepLinkAction: Equatable {
     case createPullRequest(owner: String, repo: String, base: String, head: String, title: String?, body: String?)
+    case viewRepository(owner: String, repo: String)
     case viewIssue(owner: String, repo: String, number: Int)
     case viewPullRequest(owner: String, repo: String, number: Int)
 }
@@ -63,5 +64,22 @@ final class DeepLinkHandler {
     /// Clears the pending action after it's been handled
     func clearPendingAction() {
         pendingAction = nil
+    }
+
+    // MARK: - Programmatic Navigation
+
+    /// Navigate to a repository
+    func navigateToRepository(owner: String, repo: String) {
+        pendingAction = .viewRepository(owner: owner, repo: repo)
+    }
+
+    /// Navigate to an issue
+    func navigateToIssue(owner: String, repo: String, number: Int) {
+        pendingAction = .viewIssue(owner: owner, repo: repo, number: number)
+    }
+
+    /// Navigate to a pull request
+    func navigateToPullRequest(owner: String, repo: String, number: Int) {
+        pendingAction = .viewPullRequest(owner: owner, repo: repo, number: number)
     }
 }

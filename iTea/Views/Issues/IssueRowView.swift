@@ -64,7 +64,8 @@ struct IssueRowView: View {
             comments: 5,
             createdAt: Date(),
             updatedAt: nil,
-            closedAt: nil
+            closedAt: nil,
+            repository: nil
         )
     )
     .padding()

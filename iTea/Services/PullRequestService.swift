@@ -62,4 +62,8 @@ final class PullRequestService: Sendable {
     func createComment(owner: String, repo: String, prIndex: Int, body: String) async throws -> Comment {
         try await apiClient.request(.createPullRequestComment(owner: owner, repo: repo, index: prIndex, body: body))
     }
+
+    func searchPullRequests(query: String, page: Int = 1, limit: Int = 20) async throws -> [PullRequest] {
+        try await apiClient.request(.searchPullRequests(query: query, page: page, limit: limit))
+    }
 }
