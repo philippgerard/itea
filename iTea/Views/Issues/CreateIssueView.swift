@@ -124,9 +124,11 @@ struct CreateIssueView: View {
                                     .font(.title3)
                                     .foregroundStyle(dictationManager.isRecording ? .red : .secondary)
                                     .symbolEffect(.pulse, isActive: dictationManager.isRecording)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .padding(12)
+                            .padding(4)
                         }
                     }
 
@@ -259,9 +261,10 @@ struct CreateIssueView: View {
                                 .font(.title3)
                                 .foregroundStyle(dictationManager.isRecording ? .red : .secondary)
                                 .symbolEffect(.pulse, isActive: dictationManager.isRecording)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(8)
                     }
                 } header: {
                     HStack {
