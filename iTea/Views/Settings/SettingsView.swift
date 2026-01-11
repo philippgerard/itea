@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("accentColor") private var accentColorRaw: String = AccentColorOption.system.rawValue
     @AppStorage("issueTitlePrompt") private var issueTitlePrompt = DefaultPrompts.issue
     @AppStorage("prTitlePrompt") private var prTitlePrompt = DefaultPrompts.pullRequest
+    @FocusState private var isQuickMentionFocused: Bool
 
     private enum DefaultPrompts {
         static let issue = "Generate a concise issue title (maximum 10 words) for this bug report or feature request.\nRespond with only the title text, no quotes, prefixes, or explanation."
@@ -134,6 +135,15 @@ struct SettingsView: View {
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 150)
+                    .focused($isQuickMentionFocused)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") {
+                                isQuickMentionFocused = false
+                            }
+                        }
+                    }
             }
         } header: {
             Text("Quick Actions")
