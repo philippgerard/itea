@@ -157,6 +157,15 @@ Add new endpoints to `Core/Networking/APIEndpoint.swift` as static functions. Re
 
 Gitea API docs: https://docs.gitea.com/api/1.24/
 
+## Versioning
+
+Before committing changes, **always increment the build number**:
+```bash
+agvtool next-version -all
+```
+
+This updates `CURRENT_PROJECT_VERSION` in the project. Commit the change along with your other changes.
+
 ## Git Notes
 
 - GPG signing may fail - use `--no-gpg-sign` if needed
