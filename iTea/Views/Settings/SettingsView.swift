@@ -9,7 +9,13 @@ struct SettingsView: View {
     @AppStorage("accentColor") private var accentColorRaw: String = AccentColorOption.system.rawValue
     @AppStorage("issueTitlePrompt") private var issueTitlePrompt = DefaultPrompts.issue
     @AppStorage("prTitlePrompt") private var prTitlePrompt = DefaultPrompts.pullRequest
-    @FocusState private var isQuickMentionFocused: Bool
+    @FocusState private var focusedField: FocusedField?
+
+    private enum FocusedField {
+        case quickMention
+        case issuePrompt
+        case prPrompt
+    }
 
     private enum DefaultPrompts {
         static let issue = "Generate a concise issue title (maximum 10 words) for this bug report or feature request.\nRespond with only the title text, no quotes, prefixes, or explanation."
@@ -32,6 +38,9 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .onTapGesture {
+                focusedField = nil
+            }
         }
         .alert("Sign Out", isPresented: $showLogoutConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -135,15 +144,7 @@ struct SettingsView: View {
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 150)
-                    .focused($isQuickMentionFocused)
-                    .toolbar {
-                        ToolbarItemGroup(placement: .keyboard) {
-                            Spacer()
-                            Button("Done") {
-                                isQuickMentionFocused = false
-                            }
-                        }
-                    }
+                    .focused($focusedField, equals: .quickMention)
             }
         } header: {
             Text("Quick Actions")
@@ -165,6 +166,7 @@ struct SettingsView: View {
                     .padding(8)
                     .background(Color(uiColor: .tertiarySystemFill))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .focused($focusedField, equals: .issuePrompt)
             }
             .listRowSeparator(.hidden)
 
@@ -179,6 +181,7 @@ struct SettingsView: View {
                     .padding(8)
                     .background(Color(uiColor: .tertiarySystemFill))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .focused($focusedField, equals: .prPrompt)
             }
             .listRowSeparator(.hidden)
 
