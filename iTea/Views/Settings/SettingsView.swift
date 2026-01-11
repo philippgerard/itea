@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var showLicenses = false
     @AppStorage("quickMentionText") private var quickMentionText = "@claude"
     @AppStorage("accentColor") private var accentColorRaw: String = AccentColorOption.system.rawValue
+    @FocusState private var isQuickMentionFocused: Bool
 
     private var selectedAccentColor: AccentColorOption {
         AccentColorOption(rawValue: accentColorRaw) ?? .system
@@ -116,6 +117,15 @@ struct SettingsView: View {
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 150)
+                    .focused($isQuickMentionFocused)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") {
+                                isQuickMentionFocused = false
+                            }
+                        }
+                    }
             }
         } header: {
             Text("Quick Actions")
