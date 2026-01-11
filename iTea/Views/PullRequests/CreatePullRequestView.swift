@@ -15,6 +15,7 @@ struct CreatePullRequestView: View {
     var initialBaseBranch: String?
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("prTitlePrompt") private var prTitlePrompt = "Generate a concise pull request title (maximum 10 words) for this code change.\nRespond with only the title text, no quotes, prefixes, or explanation."
 
     @State private var title = ""
     @State private var descriptionText = ""
@@ -27,6 +28,13 @@ struct CreatePullRequestView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var hasAppliedInitialValues = false
+
+    // Dictation state
+    @State private var dictationManager = DictationManager()
+    @State private var showDictationPermissionAlert = false
+    @State private var textBeforeDictation = ""
+    @State private var cursorPositionAtDictationStart: Int = 0
+    @State private var selectedRange: NSRange?
 
     private var canGenerateTitle: Bool {
         SystemLanguageModel.default.isAvailable && descriptionText.count > 20 && !isGeneratingTitle
@@ -133,12 +141,26 @@ struct CreatePullRequestView: View {
                         Text("Description")
                             .font(.headline)
                             .foregroundStyle(.secondary)
-                        TextEditor(text: $descriptionText)
-                            .frame(minHeight: 150)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(uiColor: .separator), lineWidth: 1)
-                            )
+                        ZStack(alignment: .bottomTrailing) {
+                            TextEditorWithSelection(text: $descriptionText, selectedRange: $selectedRange)
+                                .frame(minHeight: 150)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color(uiColor: .separator), lineWidth: 1)
+                                )
+
+                            // Dictation button
+                            Button {
+                                Task { await handleDictation() }
+                            } label: {
+                                Image(systemName: dictationManager.isRecording ? "mic.fill" : "mic")
+                                    .font(.title3)
+                                    .foregroundStyle(dictationManager.isRecording ? .red : .secondary)
+                                    .symbolEffect(.pulse, isActive: dictationManager.isRecording)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(12)
+                        }
                     }
                 }
                 .padding(24)
@@ -227,8 +249,22 @@ struct CreatePullRequestView: View {
                 }
 
                 Section("Description") {
-                    TextEditor(text: $descriptionText)
-                        .frame(minHeight: 150)
+                    ZStack(alignment: .bottomTrailing) {
+                        TextEditorWithSelection(text: $descriptionText, selectedRange: $selectedRange)
+                            .frame(minHeight: 150)
+
+                        // Dictation button
+                        Button {
+                            Task { await handleDictation() }
+                        } label: {
+                            Image(systemName: dictationManager.isRecording ? "mic.fill" : "mic")
+                                .font(.title3)
+                                .foregroundStyle(dictationManager.isRecording ? .red : .secondary)
+                                .symbolEffect(.pulse, isActive: dictationManager.isRecording)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(8)
+                    }
                 }
             }
             .navigationTitle("New Pull Request")
@@ -254,8 +290,24 @@ struct CreatePullRequestView: View {
             } message: {
                 Text(errorMessage ?? "Unknown error")
             }
+            .alert("Microphone Access Required", isPresented: $showDictationPermissionAlert) {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Please enable microphone and speech recognition access in Settings to use dictation.")
+            }
             .task {
                 await loadBranches()
+            }
+            .onAppear {
+                setupDictation()
+            }
+            .onDisappear {
+                dictationManager.stopRecording()
             }
         }
     }
@@ -277,16 +329,68 @@ struct CreatePullRequestView: View {
         do {
             let session = LanguageModelSession()
             let prompt = """
-            Generate a concise pull request title (maximum 10 words) for this code change:
+            \(prTitlePrompt)
 
             \(descriptionText)
-
-            Respond with only the title text, no quotes, prefixes, or explanation.
             """
             let response = try await session.respond(to: prompt)
             title = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
             // Silent fail - user can still type manually
+        }
+    }
+
+    private func setupDictation() {
+        dictationManager.onTranscription = { transcription, isFinal in
+            // Insert at cursor position (not just append)
+            let insertPosition = cursorPositionAtDictationStart
+            let beforeCursor = String(textBeforeDictation.prefix(insertPosition))
+            let afterCursor = String(textBeforeDictation.dropFirst(insertPosition))
+
+            // Process transcription for mid-sentence insertion
+            var processedTranscription = transcription
+
+            // Lowercase first letter if inserting mid-sentence (after a letter/word)
+            if let lastChar = beforeCursor.last,
+               lastChar.isLetter || lastChar == " ",
+               let firstChar = processedTranscription.first,
+               firstChar.isUppercase {
+                processedTranscription = processedTranscription.prefix(1).lowercased() + processedTranscription.dropFirst()
+            }
+
+            // Add space before if needed
+            let needsSpaceBefore = !beforeCursor.isEmpty &&
+                !beforeCursor.hasSuffix(" ") &&
+                !beforeCursor.hasSuffix("\n")
+            let spaceBefore = needsSpaceBefore ? " " : ""
+
+            // Add space after if there's text following and it doesn't start with space/punctuation
+            let needsSpaceAfter = !afterCursor.isEmpty &&
+                !afterCursor.hasPrefix(" ") &&
+                !afterCursor.hasPrefix("\n") &&
+                !(afterCursor.first?.isPunctuation ?? false)
+            let spaceAfter = needsSpaceAfter ? " " : ""
+
+            descriptionText = beforeCursor + spaceBefore + processedTranscription + spaceAfter + afterCursor
+        }
+    }
+
+    private func handleDictation() async {
+        if dictationManager.permissionDenied {
+            showDictationPermissionAlert = true
+            return
+        }
+
+        // Save current text and cursor position before starting recording
+        if !dictationManager.isRecording {
+            textBeforeDictation = descriptionText
+            // Use cursor position if available, otherwise append at end
+            cursorPositionAtDictationStart = selectedRange?.location ?? descriptionText.count
+        }
+
+        await dictationManager.toggleRecording()
+        if dictationManager.permissionDenied {
+            showDictationPermissionAlert = true
         }
     }
 

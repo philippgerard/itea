@@ -4,8 +4,16 @@ struct SettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @State private var showLogoutConfirmation = false
     @State private var showLicenses = false
+    @State private var showResetPromptsConfirmation = false
     @AppStorage("quickMentionText") private var quickMentionText = "@claude"
     @AppStorage("accentColor") private var accentColorRaw: String = AccentColorOption.system.rawValue
+    @AppStorage("issueTitlePrompt") private var issueTitlePrompt = DefaultPrompts.issue
+    @AppStorage("prTitlePrompt") private var prTitlePrompt = DefaultPrompts.pullRequest
+
+    private enum DefaultPrompts {
+        static let issue = "Generate a concise issue title (maximum 10 words) for this bug report or feature request.\nRespond with only the title text, no quotes, prefixes, or explanation."
+        static let pullRequest = "Generate a concise pull request title (maximum 10 words) for this code change.\nRespond with only the title text, no quotes, prefixes, or explanation."
+    }
 
     private var selectedAccentColor: AccentColorOption {
         AccentColorOption(rawValue: accentColorRaw) ?? .system
@@ -17,6 +25,7 @@ struct SettingsView: View {
                 accountSection
                 appearanceSection
                 quickActionsSection
+                titleGenerationSection
                 aboutSection
                 legalSection
             }
@@ -30,6 +39,15 @@ struct SettingsView: View {
             }
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+        .alert("Reset Prompts", isPresented: $showResetPromptsConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                issueTitlePrompt = DefaultPrompts.issue
+                prTitlePrompt = DefaultPrompts.pullRequest
+            }
+        } message: {
+            Text("This will reset both prompts to their default values.")
         }
     }
 
@@ -121,6 +139,50 @@ struct SettingsView: View {
             Text("Quick Actions")
         } footer: {
             Text("This text will be inserted when you tap the mention button in the new issue form.")
+        }
+    }
+
+    private var titleGenerationSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Issue Title Prompt")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                TextEditor(text: $issueTitlePrompt)
+                    .frame(height: 80)
+                    .font(.footnote)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background(Color(uiColor: .tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .listRowSeparator(.hidden)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pull Request Title Prompt")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                TextEditor(text: $prTitlePrompt)
+                    .frame(height: 80)
+                    .font(.footnote)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background(Color(uiColor: .tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .listRowSeparator(.hidden)
+
+            Button(role: .destructive) {
+                showResetPromptsConfirmation = true
+            } label: {
+                Text("Reset to Defaults")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        } header: {
+            Text("Title Generation")
+        } footer: {
+            Text("Customize the prompts used when generating titles with the sparkles button. The description you enter will be appended to these prompts.")
         }
     }
 
