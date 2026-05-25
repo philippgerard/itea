@@ -12,7 +12,6 @@ DerivedData/
 # Swift Package Manager
 .build/
 Packages/
-/*.xcodeproj/xcshareddata/xcschemes/*
 
 # CocoaPods
 Pods/
@@ -28,3 +27,28 @@ Carthage/Build/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/README.md
+fastlane/test_output/
+fastlane/.private/*
+!fastlane/.private/.gitkeep
+!fastlane/.private/README.md
+fastlane/.env
+fastlane/.env.snapshot
+!fastlane/.env.example
+!fastlane/.env.snapshot.example
+
+# App Review contact + demo credentials — phone and token are sensitive. Notes are fine to commit.
+fastlane/metadata/review_information/demo_user.txt
+fastlane/metadata/review_information/demo_password.txt
+fastlane/metadata/review_information/phone_number.txt
+fastlane/metadata_mac/review_information/demo_user.txt
+fastlane/metadata_mac/review_information/demo_password.txt
+fastlane/metadata_mac/review_information/phone_number.txt
+
+# Ruby / Bundler
+.bundle/
+vendor/bundle/
