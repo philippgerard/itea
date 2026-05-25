@@ -1,0 +1,5 @@
+app_identifier("de.philippgerard.gitea-ios")
+team_id("7WS855G6D3")
+
+# apple_id is intentionally omitted: this setup authenticates via an App Store
+# Connect API key (see fastlane/SETUP.md), not an Apple ID + 2FA flow.

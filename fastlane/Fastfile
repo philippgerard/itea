@@ -1,0 +1,113 @@
+# Also load env vars from fastlane/.private/.env (in addition to fastlane/.env,
+# which dotenv loads automatically). Both files are gitignored.
+require "dotenv"
+private_env = File.expand_path("./.private/.env", __dir__)
+Dotenv.load(private_env) if File.exist?(private_env)
+
+default_platform(:ios)
+
+# Resolves the App Store Connect API key from:
+#   • the AuthKey_<KEY_ID>.p8 file in fastlane/.private/ (gitignored).
+#     Key ID is parsed from the filename — no env var needed.
+#   • ASC_API_ISSUER_ID env var (loaded from fastlane/.env) — this UUID is
+#     team-wide and only visible on the ASC API page, not in the .p8.
+# See fastlane/SETUP.md §3.
+def asc_key
+  key_path = ENV["ASC_API_KEY_PATH"] ||
+             Dir.glob(File.expand_path("./.private/AuthKey_*.p8", __dir__)).first
+
+  unless key_path && File.exist?(key_path)
+    UI.user_error!(
+      "App Store Connect API key (.p8) not found in fastlane/.private/.\n" \
+      "See fastlane/SETUP.md §3."
+    )
+  end
+
+  key_id = ENV["ASC_API_KEY_ID"].to_s
+  if key_id.empty?
+    match = File.basename(key_path).match(/\AAuthKey_([A-Z0-9]+)\.p8\z/)
+    UI.user_error!(
+      "Could not parse Key ID from #{File.basename(key_path)}. " \
+      "Either rename the file to AuthKey_<KEY_ID>.p8 or set ASC_API_KEY_ID in fastlane/.env."
+    ) unless match
+    key_id = match[1]
+  end
+
+  issuer_id = ENV["ASC_API_ISSUER_ID"].to_s
+  if issuer_id.empty?
+    UI.user_error!(
+      "Set ASC_API_ISSUER_ID in fastlane/.env. Find the Issuer ID at\n" \
+      "App Store Connect → Users and Access → Integrations → App Store Connect API."
+    )
+  end
+
+  app_store_connect_api_key(
+    key_id: key_id,
+    issuer_id: issuer_id,
+    key_filepath: key_path
+  )
+end
+
+platform :ios do
+  desc "One-time: create the iOS app entry in App Store Connect"
+  lane :create_app do
+    produce(
+      api_key: asc_key,
+      app_name: "iTea",
+      language: "en-US",
+      sku: "itea-1",
+      app_version: "1.0"
+    )
+  end
+
+  desc "Generate iPhone & iPad screenshots via snapshot"
+  lane :screenshots do
+    # xcodebuild only forwards env vars to the UI test runner if they are
+    # prefixed with TEST_RUNNER_. The prefix is stripped before the test
+    # process sees them. Mirror our UITESTING_* vars accordingly.
+    %w[UITESTING_SERVER_URL UITESTING_TOKEN].each do |name|
+      value = ENV[name]
+      ENV["TEST_RUNNER_#{name}"] = value if value && !value.empty?
+    end
+
+    snapshot
+  end
+
+  desc "Dry-run: validate iOS metadata against App Store Connect (no upload)"
+  lane :verify_metadata do
+    precheck(
+      api_key: asc_key,
+      include_in_app_purchases: false
+    )
+  end
+
+  desc "Upload iOS metadata + screenshots to App Store Connect (no binary, no review submission)"
+  lane :upload_metadata do
+    deliver(
+      api_key: asc_key,
+      platform: "ios",
+      skip_binary_upload: true,
+      overwrite_screenshots: true,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      submit_for_review: false
+    )
+  end
+end
+
+platform :mac do
+  desc "Upload Mac metadata + screenshots to App Store Connect (no binary, no review submission)"
+  lane :upload_metadata do
+    deliver(
+      api_key: asc_key,
+      platform: "osx",
+      metadata_path: File.expand_path("./metadata_mac", __dir__),
+      screenshots_path: File.expand_path("./screenshots_mac", __dir__),
+      skip_binary_upload: true,
+      overwrite_screenshots: true,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      submit_for_review: false
+    )
+  end
+end
