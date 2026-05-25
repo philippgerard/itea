@@ -1,0 +1,8 @@
+Welcome to iTea 1.0 — a fast, native client for self-hosted Gitea and Forgejo servers.
+
+• Browse repositories, files, and commits
+• Read, create, and comment on issues
+• Track and review pull requests
+• Receive notifications across every project you watch
+• Powerful search across repositories, issues, and PRs
+• Universal app for iPhone, iPad, and Mac

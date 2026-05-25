@@ -1,0 +1,26 @@
+iTea is a fast, native client for self-hosted Gitea (and Forgejo) instances. Browse repositories, manage issues and pull requests, and stay on top of notifications — right from your Mac.
+
+FEATURES
+
+• Browse repositories, file trees, and commit history
+• Read, create, and comment on issues
+• Track and review pull requests
+• Real-time notifications across every project you watch
+• Beautiful Markdown rendering for issues, PRs, and comments
+• Powerful search across repositories, issues, and pull requests
+• Universal app — also runs on iPhone and iPad, one purchase covers everything
+• Native SwiftUI throughout, with a sidebar layout built for Mac
+• Secure: your access token lives only in the system Keychain
+
+PRIVACY
+
+iTea collects no data. There is no iTea-operated backend, no analytics, no third-party SDKs. Every request goes directly from your Mac to the Gitea (or Forgejo) server you configure.
+
+REQUIREMENTS
+
+• A self-hosted Gitea or Forgejo instance you have access to
+• A personal access token with read scopes for repositories, issues, and notifications (plus write scopes if you want to create issues or leave comments)
+
+ABOUT GITEA
+
+Gitea is a community-driven, open-source Git forge that you can self-host. Forgejo is a Gitea-compatible community fork. Both work seamlessly with iTea. Learn more at gitea.com.

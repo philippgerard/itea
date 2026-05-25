@@ -1,0 +1,1 @@
+Browse repos, manage issues and pull requests, and stay on top of notifications — a fast native client for self-hosted Gitea and Forgejo.

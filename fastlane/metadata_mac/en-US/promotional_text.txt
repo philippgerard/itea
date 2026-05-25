@@ -1,0 +1,1 @@
+A fast native Mac client for self-hosted Gitea and Forgejo. Browse repos, manage issues and pull requests, and stay on top of notifications.

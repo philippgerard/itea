@@ -1,0 +1,23 @@
+# Snapfile — iOS screenshot automation.
+# Mac screenshots are taken manually; see fastlane/SETUP.md.
+#
+# Requires a UI Test target named "iTeaUITests" with a shared scheme that
+# imports SnapshotHelper.swift and calls `snapshot("01_name")` per screen.
+
+devices([
+  "iPhone 17 Pro Max",      # 6.9" — required by App Store as of iOS 18
+  "iPad Pro 13-inch (M5)"   # 13"  — required if app supports iPad
+])
+
+languages(["en-US"])
+
+scheme("iTeaUITests")
+output_directory("./fastlane/screenshots")
+
+clear_previous_screenshots(true)
+override_status_bar(true)
+concurrent_simulators(true)
+
+# Launch arguments / env vars are passed by the UI test itself
+# (see iTeaUITests/iTeaUITests.swift, which reads UITESTING_SERVER_URL and
+# UITESTING_TOKEN from the environment). Use fastlane/.env.snapshot to set them.
