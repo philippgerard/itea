@@ -20,6 +20,22 @@ final class AuthenticationManager: ObservableObject {
     private func loadStoredCredentials() async {
         defer { isCheckingAuth = false }
 
+        // UI testing path: pull credentials from launch arguments instead of
+        // the Keychain so screenshot tests can boot straight into the app.
+        // Production behavior is unchanged when no -UITesting* args are set.
+        if let testCreds = UITestingLaunchArguments.credentials() {
+            self.serverURL = testCreds.serverURL
+            self.accessToken = testCreds.accessToken
+            do {
+                self.currentUser = try await validateAndFetchUser()
+                self.isAuthenticated = true
+            } catch {
+                self.serverURL = nil
+                self.accessToken = nil
+            }
+            return
+        }
+
         guard let credentials = await tokenStorage.load() else { return }
 
         self.serverURL = credentials.serverURL
@@ -76,6 +92,26 @@ final class AuthenticationManager: ObservableObject {
         let apiClient = APIClient(baseURL: serverURL, tokenProvider: { token })
         let userService = UserService(apiClient: apiClient)
         return try await userService.getCurrentUser()
+    }
+}
+
+private enum UITestingLaunchArguments {
+    struct Credentials {
+        let serverURL: URL
+        let accessToken: String
+    }
+
+    static func credentials() -> Credentials? {
+        let args = ProcessInfo.processInfo.arguments
+        guard
+            let serverIdx = args.firstIndex(of: "-UITestingServerURL"),
+            serverIdx + 1 < args.count,
+            let serverURL = URL(string: args[serverIdx + 1]),
+            let tokenIdx = args.firstIndex(of: "-UITestingToken"),
+            tokenIdx + 1 < args.count
+        else { return nil }
+
+        return Credentials(serverURL: serverURL, accessToken: args[tokenIdx + 1])
     }
 }
 
