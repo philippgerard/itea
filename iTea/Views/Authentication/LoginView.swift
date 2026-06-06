@@ -9,6 +9,7 @@ struct LoginView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showTokenInfo = false
+    @State private var loginTask: Task<Void, Never>?
 
     var body: some View {
         GeometryReader { geometry in
@@ -70,11 +71,15 @@ struct LoginView: View {
 
                     // Sign In button
                     Button {
-                        Task { await login() }
+                        startLogin()
                     } label: {
                         Group {
                             if isLoading {
-                                ProgressView()
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                    Text("Signing in…")
+                                        .font(.system(size: 17, weight: .semibold))
+                                }
                             } else {
                                 Text("Sign In")
                                     .font(.system(size: 17, weight: .semibold))
@@ -93,6 +98,17 @@ struct LoginView: View {
                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
+
+                    // Cancel an in-flight sign-in so a slow/stalled request never
+                    // traps the user on an indefinite spinner.
+                    if isLoading {
+                        Button("Cancel") {
+                            loginTask?.cancel()
+                        }
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 10)
+                    }
 
                     Spacer(minLength: geometry.size.height * 0.15)
                 }
@@ -115,6 +131,11 @@ struct LoginView: View {
         !serverURL.isEmpty && !accessToken.isEmpty
     }
 
+    private func startLogin() {
+        loginTask?.cancel()
+        loginTask = Task { await login() }
+    }
+
     private func login() async {
         var urlString = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if !urlString.contains("://") {
@@ -129,15 +150,21 @@ struct LoginView: View {
 
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         do {
             try await authManager.login(serverURL: url, accessToken: accessToken)
+        } catch let error as APIError where error.isCancellation {
+            // User tapped Cancel — stay on the form without an error alert.
+        } catch is CancellationError {
+            // Task cancelled before the request started — no alert.
+        } catch let error as APIError {
+            errorMessage = error.errorDescription ?? "Sign in failed. Please try again."
+            showError = true
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
-
-        isLoading = false
     }
 }
 

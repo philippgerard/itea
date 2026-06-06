@@ -6,14 +6,27 @@ final class APIClient: Sendable {
     private let session: URLSession
     private let decoder: JSONDecoder
 
+    /// Default session with bounded timeouts so a stalled connection surfaces a
+    /// clear error quickly instead of leaving the UI on an indefinite spinner.
+    /// `URLSession.shared` defaults to a 60s request timeout, which reads as a
+    /// frozen app when a network path (e.g. proxies that stall HTTP/3 over UDP)
+    /// hangs the request.
+    private static let defaultSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 30
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+
     init(
         baseURL: URL,
         tokenProvider: @escaping @Sendable () -> String?,
-        session: URLSession = .shared
+        session: URLSession? = nil
     ) {
         self.baseURL = baseURL.appendingPathComponent(AppConfiguration.apiBasePath)
         self.tokenProvider = tokenProvider
-        self.session = session
+        self.session = session ?? APIClient.defaultSession
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

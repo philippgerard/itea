@@ -31,7 +31,7 @@ enum APIError: Error, LocalizedError {
         case .decodingError(let error):
             return "Failed to parse response: \(error.localizedDescription)"
         case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
+            return Self.networkErrorDescription(for: error)
         case .unknown(let code):
             return "Unknown error (HTTP \(code))"
         }
@@ -43,6 +43,35 @@ enum APIError: Error, LocalizedError {
             return true
         default:
             return false
+        }
+    }
+
+    /// True when the underlying failure is a user/task cancellation, so callers
+    /// can suppress an error alert when the user cancelled a request themselves.
+    var isCancellation: Bool {
+        if case .networkError(let error) = self, (error as? URLError)?.code == .cancelled {
+            return true
+        }
+        return false
+    }
+
+    private static func networkErrorDescription(for error: Error) -> String {
+        guard let urlError = error as? URLError else {
+            return "Network error: \(error.localizedDescription)"
+        }
+        switch urlError.code {
+        case .timedOut:
+            return "The server took too long to respond. Check the Server URL and your connection, then try again."
+        case .notConnectedToInternet:
+            return "No internet connection. Check your network and try again."
+        case .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
+            return "Couldn't reach the server. Check that the Server URL points to a valid Gitea instance."
+        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateNotYetValid:
+            return "Couldn't establish a secure connection to the server."
+        case .cancelled:
+            return "Request cancelled."
+        default:
+            return "Network error: \(urlError.localizedDescription)"
         }
     }
 }
