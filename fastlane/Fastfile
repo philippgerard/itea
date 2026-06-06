@@ -56,7 +56,7 @@ platform :ios do
       app_name: "iTea",
       language: "en-US",
       sku: "itea-1",
-      app_version: "1.0"
+      app_version: "1.0.1"
     )
   end
 
