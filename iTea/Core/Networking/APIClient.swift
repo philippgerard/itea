@@ -19,6 +19,15 @@ final class APIClient: Sendable {
         return URLSession(configuration: configuration)
     }()
 
+    /// One automatic retry for idempotent (GET) requests whose first attempt
+    /// stalled or dropped. App Review networks are often IPv6-only (NAT64) and
+    /// can black-hole the initial connection (e.g. a stalled HTTP/3 attempt);
+    /// a fresh second attempt usually completes over a working path instead of
+    /// surfacing a timeout to the user. Mutations are never retried so a request
+    /// the server may already have processed is not duplicated.
+    private static let maxAttempts = 2
+    private static let retryDelayNanoseconds: UInt64 = 500_000_000
+
     init(
         baseURL: URL,
         tokenProvider: @escaping @Sendable () -> String?,
@@ -148,10 +157,37 @@ final class APIClient: Sendable {
     }
 
     private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await session.data(for: request)
-        } catch {
-            throw APIError.networkError(error)
+        let canRetry = request.httpMethod == "GET"
+        var attempt = 0
+        while true {
+            attempt += 1
+            do {
+                return try await session.data(for: request)
+            } catch let error as URLError {
+                guard
+                    canRetry,
+                    attempt < Self.maxAttempts,
+                    !Task.isCancelled,
+                    Self.isRetriable(error.code)
+                else {
+                    throw APIError.networkError(error)
+                }
+                try? await Task.sleep(nanoseconds: Self.retryDelayNanoseconds)
+            } catch {
+                throw APIError.networkError(error)
+            }
+        }
+    }
+
+    /// Transient connection failures worth a single retry. Excludes definitive
+    /// outcomes (offline, cancelled, TLS/certificate failures) where a retry
+    /// only adds delay before the same error.
+    private static func isRetriable(_ code: URLError.Code) -> Bool {
+        switch code {
+        case .timedOut, .cannotConnectToHost, .networkConnectionLost:
+            return true
+        default:
+            return false
         }
     }
 

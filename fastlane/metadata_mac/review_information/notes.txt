@@ -1,8 +1,9 @@
 iTea is a client for self-hosted Gitea (or Forgejo) instances. To test:
 
 1. Launch the app
-2. Enter Server URL: https://codeberg.org
-3. Click "Use Access Token" and paste the token from the "Password" field above
+2. In the "Server URL" field, enter: https://codeberg.org
+3. In the "Access Token" field, paste the token from the "Password" field above
+4. Click "Sign In"
 
 Codeberg.org runs Forgejo, a Gitea-compatible community fork — it exercises the same API endpoints iTea uses against any self-hosted Gitea instance.
 
