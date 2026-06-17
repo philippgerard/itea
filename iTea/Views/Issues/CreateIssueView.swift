@@ -86,6 +86,7 @@ struct CreateIssueView: View {
                                 .buttonStyle(.bordered)
                                 .disabled(!canGenerateTitle)
                                 .help("Generate title from description")
+                                .accessibilityLabel("Generate Title")
                             }
                         }
                     }
@@ -129,6 +130,7 @@ struct CreateIssueView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(4)
+                            .accessibilityLabel("Toggle Dictation")
                         }
                     }
 
@@ -244,6 +246,7 @@ struct CreateIssueView: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(!canGenerateTitle)
+                            .accessibilityLabel("Generate Title")
                         }
                     }
                 }
@@ -264,6 +267,7 @@ struct CreateIssueView: View {
                                 .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Toggle Dictation")
                         .buttonStyle(.plain)
                     }
                 } header: {

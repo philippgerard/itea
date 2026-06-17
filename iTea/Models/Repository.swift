@@ -17,6 +17,7 @@ struct Repository: Codable, Identifiable, Hashable, Sendable {
     let openPrCounter: Int?
     let createdAt: Date?
     let updatedAt: Date?
+    let permissions: Permissions?
 
     var ownerName: String {
         fullName.split(separator: "/").first.map(String.init) ?? owner.login

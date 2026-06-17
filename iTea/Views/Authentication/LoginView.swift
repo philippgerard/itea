@@ -56,6 +56,7 @@ struct LoginView: View {
                                     .font(.system(size: 18))
                                     .foregroundStyle(.secondary)
                             }
+                            .accessibilityLabel("Token Help")
                             .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 16)

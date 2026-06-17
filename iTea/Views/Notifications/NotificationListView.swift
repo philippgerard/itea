@@ -62,6 +62,7 @@ struct NotificationListView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
+                    .accessibilityLabel("Options")
                     .buttonStyle(.bordered)
                 }
             }

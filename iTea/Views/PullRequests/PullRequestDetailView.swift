@@ -5,51 +5,61 @@ struct PullRequestDetailView: View {
     let owner: String
     let repo: String
     let pullRequestService: PullRequestService
+    var canModifyOthers: Bool
     var onPullRequestUpdated: ((PullRequest) -> Void)?
 
     @EnvironmentObject private var authManager: AuthenticationManager
     @State private var currentPR: PullRequest
-    @State private var comments: [Comment] = []
     @State private var commitStatus: CombinedStatus?
     @State private var actionRuns: [ActionRun] = []
-    @State private var isLoading = false
     @State private var isLoadingStatus = false
-    @State private var newComment = ""
-    @State private var isSubmitting = false
     @State private var isTogglingState = false
     @State private var isMerging = false
-    @State private var errorMessage: String?
-    @State private var showError = false
     @State private var showMergeOptions = false
     @State private var statusPollingTask: Task<Void, Never>?
+    @State private var commentManager: CommentManager
     @FocusState private var isCommentFocused: Bool
-
-    // Comment editing state
-    @State private var commentToEdit: Comment?
-    @State private var commentToDelete: Comment?
-    @State private var isEditingComment = false
-    @State private var isDeletingComment = false
-    @State private var showDeleteConfirmation = false
+    @State private var stateToggleTrigger = 0
+    @State private var mergeTrigger = 0
 
     // PR editing state
     @State private var showEditPR = false
     @State private var isEditingPR = false
 
-    init(pullRequest: PullRequest, owner: String, repo: String, pullRequestService: PullRequestService, onPullRequestUpdated: ((PullRequest) -> Void)? = nil) {
+    init(pullRequest: PullRequest, owner: String, repo: String, pullRequestService: PullRequestService, canModifyOthers: Bool = false, onPullRequestUpdated: ((PullRequest) -> Void)? = nil) {
         self.pullRequest = pullRequest
         self.owner = owner
         self.repo = repo
         self.pullRequestService = pullRequestService
+        self.canModifyOthers = canModifyOthers
         self.onPullRequestUpdated = onPullRequestUpdated
         self._currentPR = State(initialValue: pullRequest)
+
+        let number = pullRequest.number
+        self._commentManager = State(initialValue: CommentManager(
+            fetch: { [pullRequestService, owner, repo, number] page in
+                try await pullRequestService.getComments(owner: owner, repo: repo, prIndex: number, page: page)
+            },
+            create: { [pullRequestService, owner, repo, number] body in
+                try await pullRequestService.createComment(owner: owner, repo: repo, prIndex: number, body: body)
+            },
+            edit: { [pullRequestService, owner, repo] commentId, body in
+                try await pullRequestService.editComment(owner: owner, repo: repo, commentId: commentId, body: body)
+            },
+            delete: { [pullRequestService, owner, repo] commentId in
+                try await pullRequestService.deleteComment(owner: owner, repo: repo, commentId: commentId)
+            }
+        ))
     }
 
     private var canEditPR: Bool {
         guard let currentUserId = authManager.currentUser?.id else { return false }
-        return currentPR.user.id == currentUserId
+        return currentPR.user.id == currentUserId || canModifyOthers
     }
 
     var body: some View {
+        @Bindable var commentManager = commentManager
+
         ScrollView {
             VStack(spacing: 16) {
                 // Header card
@@ -78,6 +88,8 @@ struct PullRequestDetailView: View {
         .safeAreaInset(edge: .bottom) {
             commentInputBar
         }
+        .sensoryFeedback(.impact(weight: .medium), trigger: stateToggleTrigger)
+        .sensoryFeedback(.success, trigger: mergeTrigger)
         .navigationTitle("#\(currentPR.number)")
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         #if !targetEnvironment(macCatalyst)
@@ -129,6 +141,7 @@ struct PullRequestDetailView: View {
                         Image(systemName: "ellipsis.circle")
                     }
                 }
+                .accessibilityLabel("More Options")
             }
         }
         .sheet(isPresented: $showMergeOptions) {
@@ -141,27 +154,27 @@ struct PullRequestDetailView: View {
             .presentationDetents([.height(280)])
             .presentationDragIndicator(.visible)
         }
-        .alert("Error", isPresented: $showError) {
+        .alert("Error", isPresented: $commentManager.showError) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text(errorMessage ?? "Unknown error")
+            Text(commentManager.errorMessage ?? "Unknown error")
         }
-        .alert("Delete Comment?", isPresented: $showDeleteConfirmation) {
+        .alert("Delete Comment?", isPresented: $commentManager.showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
-                if let comment = commentToDelete {
-                    Task { await deleteComment(comment) }
+                if let comment = commentManager.commentToDelete {
+                    Task { await commentManager.deleteComment(comment) }
                 }
             }
             Button("Cancel", role: .cancel) {
-                commentToDelete = nil
+                commentManager.commentToDelete = nil
             }
         } message: {
             Text("This action cannot be undone.")
         }
-        .sheet(item: $commentToEdit) { comment in
+        .sheet(item: $commentManager.commentToEdit) { comment in
             EditCommentSheet(
                 comment: comment,
-                isSaving: $isEditingComment
+                isSaving: $commentManager.isEditingComment
             ) { result in
                 Task { await editComment(comment, newBody: result.body) }
             }
@@ -179,7 +192,7 @@ struct PullRequestDetailView: View {
             .presentationDragIndicator(.visible)
         }
         .task {
-            await loadComments()
+            await commentManager.loadComments()
             await loadCommitStatus()
         }
         .onAppear {
@@ -508,7 +521,7 @@ struct PullRequestDetailView: View {
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Section header
-            if !comments.isEmpty || isLoading {
+            if !commentManager.comments.isEmpty || commentManager.isLoading {
                 Text("Comments")
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -517,26 +530,27 @@ struct PullRequestDetailView: View {
                     .padding(.top, 8)
             }
 
-            if isLoading {
+            if commentManager.isLoading {
                 HStack {
                     Spacer()
                     ProgressView()
                         .padding(.vertical, 20)
                     Spacer()
                 }
-            } else if comments.isEmpty {
+            } else if commentManager.comments.isEmpty {
                 Text("No comments yet")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
             } else {
-                ForEach(comments) { comment in
+                ForEach(commentManager.comments) { comment in
                     CommentView(
                         comment: comment,
                         currentUserId: authManager.currentUser?.id,
-                        onEdit: { commentToEdit = $0 },
-                        onDelete: { commentToDelete = $0; showDeleteConfirmation = true }
+                        canModifyOthers: canModifyOthers,
+                        onEdit: { commentManager.commentToEdit = $0 },
+                        onDelete: { commentManager.commentToDelete = $0; commentManager.showDeleteConfirmation = true }
                     )
                 }
             }
@@ -547,7 +561,7 @@ struct PullRequestDetailView: View {
 
     private var commentInputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField("Add a comment...", text: $newComment, axis: .vertical)
+            TextField("Add a comment...", text: $commentManager.newComment, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...6)
                 .padding(.horizontal, 12)
@@ -559,7 +573,7 @@ struct PullRequestDetailView: View {
             Button {
                 Task { await submitComment() }
             } label: {
-                if isSubmitting {
+                if commentManager.isSubmitting {
                     ProgressView()
                         .controlSize(.small)
                         .frame(width: 32, height: 32)
@@ -567,12 +581,13 @@ struct PullRequestDetailView: View {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 32))
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.accentColor)
+                        .foregroundStyle(commentManager.canSubmit ? Color.accentColor : Color.secondary)
                 }
             }
             .buttonStyle(.plain)
-            .disabled(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
-            .animation(.easeInOut(duration: 0.15), value: newComment.isEmpty)
+            .disabled(!commentManager.canSubmit || commentManager.isSubmitting)
+            .animation(.easeInOut(duration: 0.15), value: commentManager.newComment.isEmpty)
+            .accessibilityLabel("Send Comment")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
@@ -588,21 +603,9 @@ struct PullRequestDetailView: View {
 
     private func refresh() async {
         async let prTask: () = refreshPullRequest()
-        async let commentsTask: () = refreshComments()
+        async let commentsTask: () = commentManager.refreshComments()
         async let statusTask: () = loadCommitStatus()
         _ = await (prTask, commentsTask, statusTask)
-    }
-
-    private func refreshComments() async {
-        do {
-            comments = try await pullRequestService.getComments(
-                owner: owner,
-                repo: repo,
-                prIndex: currentPR.number
-            )
-        } catch {
-            // Silently fail on refresh - user can pull again
-        }
     }
 
     private func refreshPullRequest() async {
@@ -617,21 +620,6 @@ struct PullRequestDetailView: View {
         } catch {
             // Silently fail on refresh - data is still shown from before
         }
-    }
-
-    private func loadComments() async {
-        isLoading = true
-        do {
-            comments = try await pullRequestService.getComments(
-                owner: owner,
-                repo: repo,
-                prIndex: currentPR.number
-            )
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-        isLoading = false
     }
 
     private func loadCommitStatus() async {
@@ -672,6 +660,10 @@ struct PullRequestDetailView: View {
         // Only poll for open PRs
         guard currentPR.isOpen else { return }
 
+        // Cancel any existing polling task to prevent stacking when
+        // onAppear fires again (e.g. after dismissing a sheet).
+        statusPollingTask?.cancel()
+
         statusPollingTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
@@ -696,24 +688,10 @@ struct PullRequestDetailView: View {
     }
 
     private func submitComment() async {
-        isSubmitting = true
         isCommentFocused = false
-
-        do {
-            let comment = try await pullRequestService.createComment(
-                owner: owner,
-                repo: repo,
-                prIndex: currentPR.number,
-                body: newComment
-            )
-            comments.append(comment)
-            newComment = ""
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-
-        isSubmitting = false
+        let body = commentManager.newComment.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else { return }
+        _ = await commentManager.submitComment(body: body)
     }
 
     private func togglePRState() async {
@@ -736,9 +714,10 @@ struct PullRequestDetailView: View {
             }
             currentPR = updatedPR
             onPullRequestUpdated?(updatedPR)
+            stateToggleTrigger += 1
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            commentManager.errorMessage = error.localizedDescription
+            commentManager.showError = true
         }
 
         isTogglingState = false
@@ -766,53 +745,17 @@ struct PullRequestDetailView: View {
 
             // Stop polling since PR is now merged
             stopStatusPolling()
+            mergeTrigger += 1
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            commentManager.errorMessage = error.localizedDescription
+            commentManager.showError = true
         }
 
         isMerging = false
     }
 
     private func editComment(_ comment: Comment, newBody: String) async {
-        isEditingComment = true
-
-        do {
-            let updatedComment = try await pullRequestService.editComment(
-                owner: owner,
-                repo: repo,
-                commentId: comment.id,
-                body: newBody
-            )
-            if let index = comments.firstIndex(where: { $0.id == comment.id }) {
-                comments[index] = updatedComment
-            }
-            commentToEdit = nil
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-
-        isEditingComment = false
-    }
-
-    private func deleteComment(_ comment: Comment) async {
-        isDeletingComment = true
-
-        do {
-            try await pullRequestService.deleteComment(
-                owner: owner,
-                repo: repo,
-                commentId: comment.id
-            )
-            comments.removeAll { $0.id == comment.id }
-            commentToDelete = nil
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-
-        isDeletingComment = false
+        await commentManager.editCommentBody(comment, newBody: newBody)
     }
 
     private func editPullRequest(title: String, body: String) async {
@@ -830,8 +773,8 @@ struct PullRequestDetailView: View {
             onPullRequestUpdated?(updatedPR)
             showEditPR = false
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            commentManager.errorMessage = error.localizedDescription
+            commentManager.showError = true
         }
 
         isEditingPR = false

@@ -65,7 +65,8 @@ struct RepositoryRowView: View {
             openIssuesCount: 5,
             openPrCounter: 2,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            permissions: nil
         )
     )
     .padding()

@@ -149,6 +149,36 @@ Add new endpoints to `Core/Networking/APIEndpoint.swift` as static functions. Re
 2. Conform to `Codable, Identifiable, Hashable, Sendable`
 3. Use `CodingKeys` if API field names differ (decoder uses `convertFromSnakeCase`)
 
+## Code Review & Analysis Tasks
+
+Any task that produces findings about the codebase (bug reports, improvement suggestions, audits, refactor proposals, etc.) **must include an antagonistic verification pass** before results are presented as final.
+
+### Why
+
+Initial analyses of this codebase have produced ~40% false, overstated, or actively-wrong findings when unchecked. Hallucinated claims erode trust and waste the maintainer's time debunking them. An independent verification step catches the majority of these.
+
+### Required workflow
+
+1. **Produce findings** — the initial analysis pass.
+2. **Antagonistic verification** — spawn independent subagents (or do a separate pass) that re-read the actual source and attempt to *refute* each finding. Do not let the same context that produced a finding also verify it.
+3. **Grade each finding** as TRUE / FALSE / PARTIALLY TRUE / OVERSTATED with exact `file:line` evidence.
+4. **Present the verified scorecard** — be explicit about what was wrong, not just what held up. Wrong findings are as important to surface as correct ones.
+
+### Common pitfalls to actively check
+
+When verifying (or producing) findings, these have been recurring sources of error in this codebase:
+
+- **Assuming instance state where a `static let` is shared.** `APIClient.defaultSession` is a singleton — all `APIClient` instances share one `URLSession`. Do not claim connection pools are fragmented without confirming the storage qualifier.
+- **Misreading async control flow.** Verify whether a flag is set *before or after* an `await` when claiming a race condition. The check-then-set pattern in `loadMoreIfNeeded` is synchronous and safe.
+- **Assuming framework defaults are absent.** `URLSession.shared` ships with a `URLCache`. SwiftUI semantic `Font` styles (`.caption`, `.caption2`, `.body`, etc.) scale with Dynamic Type. Do not claim these are missing or fixed without confirming.
+- **Recommending changes that break compatibility.** Gitea's `Authorization: token <token>` scheme is the documented standard; `Bearer` support is version-dependent. Verify against Gitea API docs before recommending protocol changes.
+- **Theoretical vs. practical.** A "stale closure capture" is not a bug if the captured value is immutable for the session and views are recreated on auth changes. Assess whether a code smell can actually manifest.
+- **Overstating severity.** `String.data(using: .utf8)` on a Swift `String` cannot return `nil`. Force-unwrapping it is not a crash risk.
+
+### Applies to
+
+Code audits, refactor proposals, architecture reviews, security assessments, performance analyses, and any "suggest improvements" task. Does not apply to mechanical tasks (rename a symbol, add an endpoint, fix a lint error) where the change is self-evidently correct.
+
 ## Dependencies
 
 - **MarkdownUI** (`swift-markdown-ui` >= 2.4.1) - Markdown rendering

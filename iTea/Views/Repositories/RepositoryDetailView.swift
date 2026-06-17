@@ -30,7 +30,8 @@ struct RepositoryDetailView: View {
                         owner: repository.ownerName,
                         repo: repository.repoName,
                         issueService: issueService,
-                        attachmentService: attachmentService
+                        attachmentService: attachmentService,
+                        canModifyOthers: repository.permissions?.canModifyOthers ?? false
                     )
                 case 1:
                     PullRequestListView(
@@ -38,7 +39,8 @@ struct RepositoryDetailView: View {
                         repo: repository.repoName,
                         pullRequestService: pullRequestService,
                         repositoryService: repositoryService,
-                        attachmentService: attachmentService
+                        attachmentService: attachmentService,
+                        canModifyOthers: repository.permissions?.canModifyOthers ?? false
                     )
                 default:
                     EmptyView()
@@ -166,7 +168,8 @@ struct RepositoryDetailView: View {
                 openIssuesCount: 5,
                 openPrCounter: 2,
                 createdAt: nil,
-                updatedAt: nil
+                updatedAt: nil,
+                permissions: nil
             ),
             repositoryService: RepositoryService(apiClient: apiClient)
         )

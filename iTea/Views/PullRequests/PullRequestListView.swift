@@ -6,28 +6,21 @@ struct PullRequestListView: View {
     let pullRequestService: PullRequestService
     let repositoryService: RepositoryService
     let attachmentService: AttachmentService
+    var canModifyOthers: Bool = false
 
     @State private var pullRequests: [PullRequest] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var selectedState: PRState = .open
+    @State private var selectedState: ItemState = .open
     @State private var showCreatePR = false
     @State private var currentPage = 1
     @State private var hasMorePages = true
-
-    enum PRState: String, CaseIterable {
-        case open, closed, all
-
-        var displayName: String {
-            rawValue.capitalized
-        }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
             // Filter picker with glass background
             Picker("State", selection: $selectedState) {
-                ForEach(PRState.allCases, id: \.self) { state in
+                ForEach(ItemState.allCases, id: \.self) { state in
                     Text(state.displayName).tag(state)
                 }
             }
@@ -123,7 +116,8 @@ struct PullRequestListView: View {
                 pullRequest: pr,
                 owner: owner,
                 repo: repo,
-                pullRequestService: pullRequestService
+                pullRequestService: pullRequestService,
+                canModifyOthers: canModifyOthers
             )
         }
     }
@@ -137,7 +131,7 @@ struct PullRequestListView: View {
             pullRequests = try await pullRequestService.getPullRequests(
                 owner: owner,
                 repo: repo,
-                state: selectedState.rawValue,
+                state: selectedState,
                 page: currentPage
             )
             hasMorePages = !pullRequests.isEmpty
@@ -160,7 +154,7 @@ struct PullRequestListView: View {
             let morePRs = try await pullRequestService.getPullRequests(
                 owner: owner,
                 repo: repo,
-                state: selectedState.rawValue,
+                state: selectedState,
                 page: currentPage
             )
             hasMorePages = !morePRs.isEmpty

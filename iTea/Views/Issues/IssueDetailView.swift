@@ -7,26 +7,16 @@ struct IssueDetailView: View {
     let repo: String
     let issueService: IssueService
     let attachmentService: AttachmentService
+    var canModifyOthers: Bool
     var onIssueUpdated: ((Issue) -> Void)?
 
     @EnvironmentObject private var authManager: AuthenticationManager
     @State private var currentIssue: Issue
-    @State private var comments: [Comment] = []
     @State private var attachments: [Attachment] = []
-    @State private var isLoading = false
-    @State private var newComment = ""
-    @State private var isSubmitting = false
     @State private var isTogglingState = false
-    @State private var errorMessage: String?
-    @State private var showError = false
+    @State private var commentManager: CommentManager
     @FocusState private var isCommentFocused: Bool
-
-    // Comment editing state
-    @State private var commentToEdit: Comment?
-    @State private var commentToDelete: Comment?
-    @State private var isEditingComment = false
-    @State private var isDeletingComment = false
-    @State private var showDeleteConfirmation = false
+    @State private var stateToggleTrigger = 0
 
     // Issue editing state
     @State private var showEditIssue = false
@@ -40,22 +30,41 @@ struct IssueDetailView: View {
     @State private var pendingCommentAttachments: [PendingAttachment] = []
     @State private var isLoadingPhotos = false
 
-    init(issue: Issue, owner: String, repo: String, issueService: IssueService, attachmentService: AttachmentService, onIssueUpdated: ((Issue) -> Void)? = nil) {
+    init(issue: Issue, owner: String, repo: String, issueService: IssueService, attachmentService: AttachmentService, canModifyOthers: Bool = false, onIssueUpdated: ((Issue) -> Void)? = nil) {
         self.issue = issue
         self.owner = owner
         self.repo = repo
         self.issueService = issueService
         self.attachmentService = attachmentService
+        self.canModifyOthers = canModifyOthers
         self.onIssueUpdated = onIssueUpdated
         self._currentIssue = State(initialValue: issue)
+
+        let number = issue.number
+        self._commentManager = State(initialValue: CommentManager(
+            fetch: { [issueService, owner, repo, number] page in
+                try await issueService.getComments(owner: owner, repo: repo, issueIndex: number, page: page)
+            },
+            create: { [issueService, owner, repo, number] body in
+                try await issueService.createComment(owner: owner, repo: repo, issueIndex: number, body: body)
+            },
+            edit: { [issueService, owner, repo] commentId, body in
+                try await issueService.editComment(owner: owner, repo: repo, commentId: commentId, body: body)
+            },
+            delete: { [issueService, owner, repo] commentId in
+                try await issueService.deleteComment(owner: owner, repo: repo, commentId: commentId)
+            }
+        ))
     }
 
     private var canEditIssue: Bool {
         guard let currentUserId = authManager.currentUser?.id else { return false }
-        return currentIssue.user.id == currentUserId
+        return currentIssue.user.id == currentUserId || canModifyOthers
     }
 
     var body: some View {
+        @Bindable var commentManager = commentManager
+
         ScrollView {
             VStack(spacing: 16) {
                 // Header card
@@ -79,6 +88,7 @@ struct IssueDetailView: View {
         .safeAreaInset(edge: .bottom) {
             commentInputBar
         }
+        .sensoryFeedback(.impact(weight: .medium), trigger: stateToggleTrigger)
         .navigationTitle("#\(currentIssue.number)")
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         #if !targetEnvironment(macCatalyst)
@@ -115,30 +125,31 @@ struct IssueDetailView: View {
                         Image(systemName: "ellipsis.circle")
                     }
                 }
+                .accessibilityLabel("More Options")
             }
         }
-        .alert("Error", isPresented: $showError) {
+        .alert("Error", isPresented: $commentManager.showError) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text(errorMessage ?? "Unknown error")
+            Text(commentManager.errorMessage ?? "Unknown error")
         }
-        .alert("Delete Comment?", isPresented: $showDeleteConfirmation) {
+        .alert("Delete Comment?", isPresented: $commentManager.showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
-                if let comment = commentToDelete {
-                    Task { await deleteComment(comment) }
+                if let comment = commentManager.commentToDelete {
+                    Task { await commentManager.deleteComment(comment) }
                 }
             }
             Button("Cancel", role: .cancel) {
-                commentToDelete = nil
+                commentManager.commentToDelete = nil
             }
         } message: {
             Text("This action cannot be undone.")
         }
-        .sheet(item: $commentToEdit) { comment in
+        .sheet(item: $commentManager.commentToEdit) { comment in
             EditCommentSheet(
                 comment: comment,
                 token: authManager.getAccessToken(),
-                isSaving: $isEditingComment
+                isSaving: $commentManager.isEditingComment
             ) { result in
                 Task { await editComment(comment, result: result) }
             }
@@ -158,7 +169,7 @@ struct IssueDetailView: View {
             .presentationDragIndicator(.visible)
         }
         .task {
-            async let commentsTask: () = loadComments()
+            async let commentsTask: () = self.commentManager.loadComments()
             async let attachmentsTask: () = loadAttachments()
             _ = await (commentsTask, attachmentsTask)
         }
@@ -268,7 +279,7 @@ struct IssueDetailView: View {
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Section header
-            if !comments.isEmpty || isLoading {
+            if !commentManager.comments.isEmpty || commentManager.isLoading {
                 Text("Comments")
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -277,14 +288,14 @@ struct IssueDetailView: View {
                     .padding(.top, 8)
             }
 
-            if isLoading {
+            if commentManager.isLoading {
                 HStack {
                     Spacer()
                     ProgressView()
                         .padding(.vertical, 20)
                     Spacer()
                 }
-            } else if comments.isEmpty {
+            } else if commentManager.comments.isEmpty {
                 // Empty state - subtle
                 Text("No comments yet")
                     .font(.subheadline)
@@ -292,13 +303,14 @@ struct IssueDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
             } else {
-                ForEach(comments) { comment in
+                ForEach(commentManager.comments) { comment in
                     CommentView(
                         comment: comment,
                         currentUserId: authManager.currentUser?.id,
                         token: authManager.getAccessToken(),
-                        onEdit: { commentToEdit = $0 },
-                        onDelete: { commentToDelete = $0; showDeleteConfirmation = true },
+                        canModifyOthers: canModifyOthers,
+                        onEdit: { commentManager.commentToEdit = $0 },
+                        onDelete: { commentManager.commentToDelete = $0; commentManager.showDeleteConfirmation = true },
                         onAttachmentTap: { selectedAttachment = $0 }
                     )
                 }
@@ -309,7 +321,7 @@ struct IssueDetailView: View {
     // MARK: - Comment Input
 
     private var canSubmitComment: Bool {
-        !newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !pendingCommentAttachments.isEmpty
+        commentManager.canSubmit || !pendingCommentAttachments.isEmpty
     }
 
     private var commentInputBar: some View {
@@ -354,9 +366,10 @@ struct IssueDetailView: View {
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityLabel("Add Attachment")
                 .buttonStyle(.plain)
 
-                TextField("Add a comment...", text: $newComment, axis: .vertical)
+                TextField("Add a comment...", text: $commentManager.newComment, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...6)
                     .padding(.horizontal, 12)
@@ -368,7 +381,7 @@ struct IssueDetailView: View {
                 Button {
                     Task { await submitComment() }
                 } label: {
-                    if isSubmitting {
+                    if commentManager.isSubmitting {
                         ProgressView()
                             .controlSize(.small)
                             .frame(width: 36, height: 36)
@@ -380,8 +393,9 @@ struct IssueDetailView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(!canSubmitComment || isSubmitting)
+                .disabled(!canSubmitComment || commentManager.isSubmitting)
                 .animation(.easeInOut(duration: 0.15), value: canSubmitComment)
+                .accessibilityLabel("Send Comment")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -403,21 +417,9 @@ struct IssueDetailView: View {
 
     private func refresh() async {
         async let issueTask: () = refreshIssue()
-        async let commentsTask: () = refreshComments()
+        async let commentsTask: () = commentManager.refreshComments()
         async let attachmentsTask: () = loadAttachments()
         _ = await (issueTask, commentsTask, attachmentsTask)
-    }
-
-    private func refreshComments() async {
-        do {
-            comments = try await issueService.getComments(
-                owner: owner,
-                repo: repo,
-                issueIndex: currentIssue.number
-            )
-        } catch {
-            // Silently fail on refresh - user can pull again
-        }
     }
 
     private func refreshIssue() async {
@@ -434,21 +436,6 @@ struct IssueDetailView: View {
         }
     }
 
-    private func loadComments() async {
-        isLoading = true
-        do {
-            comments = try await issueService.getComments(
-                owner: owner,
-                repo: repo,
-                issueIndex: currentIssue.number
-            )
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-        isLoading = false
-    }
-
     private func loadAttachments() async {
         do {
             attachments = try await attachmentService.getIssueAttachments(
@@ -462,25 +449,20 @@ struct IssueDetailView: View {
     }
 
     private func submitComment() async {
-        isSubmitting = true
         isCommentFocused = false
 
-        do {
-            // Use a placeholder body if only attachments are provided
-            let commentBody = newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? (pendingCommentAttachments.isEmpty ? "" : " ")
-                : newComment
+        // Use a placeholder body if only attachments are provided
+        let trimmed = commentManager.newComment.trimmingCharacters(in: .whitespacesAndNewlines)
+        let commentBody = trimmed.isEmpty
+            ? (pendingCommentAttachments.isEmpty ? "" : " ")
+            : commentManager.newComment
 
-            let comment = try await issueService.createComment(
-                owner: owner,
-                repo: repo,
-                issueIndex: currentIssue.number,
-                body: commentBody
-            )
+        guard !commentBody.isEmpty else { return }
 
+        if let comment = await commentManager.submitComment(body: commentBody) {
             // Upload attachments if any
             for attachment in pendingCommentAttachments {
-                _ = try await attachmentService.uploadCommentAttachment(
+                try? await attachmentService.uploadCommentAttachment(
                     owner: owner,
                     repo: repo,
                     commentId: comment.id,
@@ -491,16 +473,9 @@ struct IssueDetailView: View {
             }
 
             // Reload comments to get the updated comment with attachments
-            await refreshComments()
-
-            newComment = ""
+            await commentManager.refreshComments()
             pendingCommentAttachments = []
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
         }
-
-        isSubmitting = false
     }
 
     private func loadSelectedPhotos() async {
@@ -582,15 +557,16 @@ struct IssueDetailView: View {
             currentIssue = updatedIssue
             onIssueUpdated?(updatedIssue)
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            commentManager.errorMessage = error.localizedDescription
+            commentManager.showError = true
         }
 
         isTogglingState = false
     }
 
     private func editComment(_ comment: Comment, result: CommentEditResult) async {
-        isEditingComment = true
+        commentManager.isEditingComment = true
+        defer { commentManager.isEditingComment = false }
 
         do {
             // Delete attachments marked for removal
@@ -605,12 +581,9 @@ struct IssueDetailView: View {
 
             // Update comment body only if it changed
             if result.body != comment.body {
-                _ = try await issueService.editComment(
-                    owner: owner,
-                    repo: repo,
-                    commentId: comment.id,
-                    body: result.body
-                )
+                try await commentManager.editCommentBody(comment, newBody: result.body)
+            } else {
+                commentManager.commentToEdit = nil
             }
 
             // Upload new attachments
@@ -626,33 +599,11 @@ struct IssueDetailView: View {
             }
 
             // Refresh comments to get updated data
-            await refreshComments()
-            commentToEdit = nil
+            await commentManager.refreshComments()
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            commentManager.errorMessage = error.localizedDescription
+            commentManager.showError = true
         }
-
-        isEditingComment = false
-    }
-
-    private func deleteComment(_ comment: Comment) async {
-        isDeletingComment = true
-
-        do {
-            try await issueService.deleteComment(
-                owner: owner,
-                repo: repo,
-                commentId: comment.id
-            )
-            comments.removeAll { $0.id == comment.id }
-            commentToDelete = nil
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-
-        isDeletingComment = false
     }
 
     private func editIssue(result: IssueEditResult) async {
@@ -680,8 +631,9 @@ struct IssueDetailView: View {
                     title: result.title,
                     body: result.body
                 )
-                currentIssue = updatedIssue
-                onIssueUpdated?(updatedIssue)
+            currentIssue = updatedIssue
+            onIssueUpdated?(updatedIssue)
+            stateToggleTrigger += 1
             }
 
             // Upload new attachments
@@ -700,8 +652,8 @@ struct IssueDetailView: View {
             await loadAttachments()
             showEditIssue = false
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            commentManager.errorMessage = error.localizedDescription
+            commentManager.showError = true
         }
 
         isEditingIssue = false

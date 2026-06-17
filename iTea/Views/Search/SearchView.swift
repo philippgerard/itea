@@ -66,6 +66,7 @@ struct SearchView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityLabel("Clear Search")
                         .buttonStyle(.plain)
                     }
                 }

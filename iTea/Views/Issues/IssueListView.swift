@@ -5,28 +5,21 @@ struct IssueListView: View {
     let repo: String
     let issueService: IssueService
     let attachmentService: AttachmentService
+    var canModifyOthers: Bool = false
 
     @State private var issues: [Issue] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var selectedState: IssueState = .open
+    @State private var selectedState: ItemState = .open
     @State private var showCreateIssue = false
     @State private var currentPage = 1
     @State private var hasMorePages = true
-
-    enum IssueState: String, CaseIterable {
-        case open, closed, all
-
-        var displayName: String {
-            rawValue.capitalized
-        }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
             // Filter picker with glass background
             Picker("State", selection: $selectedState) {
-                ForEach(IssueState.allCases, id: \.self) { state in
+                ForEach(ItemState.allCases, id: \.self) { state in
                     Text(state.displayName).tag(state)
                 }
             }
@@ -69,6 +62,7 @@ struct IssueListView: View {
                     Image(systemName: "plus")
                         .fontWeight(.medium)
                 }
+                .accessibilityLabel("New Issue")
             }
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
@@ -123,7 +117,8 @@ struct IssueListView: View {
                 owner: owner,
                 repo: repo,
                 issueService: issueService,
-                attachmentService: attachmentService
+                attachmentService: attachmentService,
+                canModifyOthers: canModifyOthers
             )
         }
     }
@@ -137,7 +132,7 @@ struct IssueListView: View {
             issues = try await issueService.getIssues(
                 owner: owner,
                 repo: repo,
-                state: selectedState.rawValue,
+                state: selectedState,
                 page: currentPage
             )
             hasMorePages = !issues.isEmpty
@@ -160,7 +155,7 @@ struct IssueListView: View {
             let moreIssues = try await issueService.getIssues(
                 owner: owner,
                 repo: repo,
-                state: selectedState.rawValue,
+                state: selectedState,
                 page: currentPage
             )
             hasMorePages = !moreIssues.isEmpty

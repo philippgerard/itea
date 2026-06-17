@@ -7,7 +7,7 @@ final class IssueService: Sendable {
         self.apiClient = apiClient
     }
 
-    func getIssues(owner: String, repo: String, state: String = "open", page: Int = 1, limit: Int = 20) async throws -> [Issue] {
+    func getIssues(owner: String, repo: String, state: ItemState = .open, page: Int = 1, limit: Int = 20) async throws -> [Issue] {
         try await apiClient.request(.issues(owner: owner, repo: repo, state: state, page: page, limit: limit))
     }
 

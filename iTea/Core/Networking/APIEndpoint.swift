@@ -110,11 +110,11 @@ struct APIEndpoint: Sendable {
 
     // MARK: - Issue Endpoints
 
-    static func issues(owner: String, repo: String, state: String = "open", page: Int = 1, limit: Int = 20) -> APIEndpoint {
+    static func issues(owner: String, repo: String, state: ItemState = .open, page: Int = 1, limit: Int = 20) -> APIEndpoint {
         APIEndpoint(
             path: "/repos/\(owner)/\(repo)/issues",
             queryItems: [
-                URLQueryItem(name: "state", value: state),
+                URLQueryItem(name: "state", value: state.rawValue),
                 URLQueryItem(name: "page", value: "\(page)"),
                 URLQueryItem(name: "limit", value: "\(limit)"),
                 URLQueryItem(name: "type", value: "issues")
@@ -176,11 +176,11 @@ struct APIEndpoint: Sendable {
 
     // MARK: - Pull Request Endpoints
 
-    static func pullRequests(owner: String, repo: String, state: String = "open", page: Int = 1, limit: Int = 20) -> APIEndpoint {
+    static func pullRequests(owner: String, repo: String, state: ItemState = .open, page: Int = 1, limit: Int = 20) -> APIEndpoint {
         APIEndpoint(
             path: "/repos/\(owner)/\(repo)/pulls",
             queryItems: [
-                URLQueryItem(name: "state", value: state),
+                URLQueryItem(name: "state", value: state.rawValue),
                 URLQueryItem(name: "page", value: "\(page)"),
                 URLQueryItem(name: "limit", value: "\(limit)")
             ]

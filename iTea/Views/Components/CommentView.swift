@@ -4,14 +4,16 @@ struct CommentView: View {
     let comment: Comment
     let currentUserId: Int?
     let token: String?
+    var canModifyOthers: Bool
     var onEdit: ((Comment) -> Void)?
     var onDelete: ((Comment) -> Void)?
     var onAttachmentTap: ((Attachment) -> Void)?
 
-    init(comment: Comment, currentUserId: Int? = nil, token: String? = nil, onEdit: ((Comment) -> Void)? = nil, onDelete: ((Comment) -> Void)? = nil, onAttachmentTap: ((Attachment) -> Void)? = nil) {
+    init(comment: Comment, currentUserId: Int? = nil, token: String? = nil, canModifyOthers: Bool = false, onEdit: ((Comment) -> Void)? = nil, onDelete: ((Comment) -> Void)? = nil, onAttachmentTap: ((Attachment) -> Void)? = nil) {
         self.comment = comment
         self.currentUserId = currentUserId
         self.token = token
+        self.canModifyOthers = canModifyOthers
         self.onEdit = onEdit
         self.onDelete = onDelete
         self.onAttachmentTap = onAttachmentTap
@@ -19,7 +21,7 @@ struct CommentView: View {
 
     private var canModify: Bool {
         guard let currentUserId else { return false }
-        return comment.user.id == currentUserId
+        return comment.user.id == currentUserId || canModifyOthers
     }
 
     var body: some View {
@@ -71,6 +73,7 @@ struct CommentView: View {
                             .padding(8)
                             .contentShape(Rectangle())
                     }
+                    .accessibilityLabel("Comment Options")
                 }
             }
 

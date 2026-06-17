@@ -7,7 +7,7 @@ final class PullRequestService: Sendable {
         self.apiClient = apiClient
     }
 
-    func getPullRequests(owner: String, repo: String, state: String = "open", page: Int = 1, limit: Int = 20) async throws -> [PullRequest] {
+    func getPullRequests(owner: String, repo: String, state: ItemState = .open, page: Int = 1, limit: Int = 20) async throws -> [PullRequest] {
         try await apiClient.request(.pullRequests(owner: owner, repo: repo, state: state, page: page, limit: limit))
     }
 
